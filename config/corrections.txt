@@ -1,0 +1,35 @@
+# Corrections appliquées après transcription. Format : entendu|voulu
+# Insensible à la casse, sur mots entiers. Une règle par ligne, # pour commenter.
+commis|commit
+redit|Redis
+rédit|Redis
+worktrade|worktree
+worktreet|worktree
+worktrit|worktree
+bache|Bash
+bash|Bash
+pest|Pest
+livewire|Livewire
+laravelle|Laravel
+larvel|Laravel
+composeur|Composer
+compozer|Composer
+tailleurvent|Tailwind
+taillevent|Tailwind
+guite|git
+guitte|git
+poulrequest|pull request
+pull rêquest|pull request
+merdge|merge
+rebasse|rebase
+débugue|debug
+dèbug|debug
+endepoint|endpoint
+backende|backend
+frontende|frontend
+docaire|Docker
+postgresse|PostgreSQL
+artisane|artisan
+éloquente|Eloquent
+filament|Filament
+astro|Astro

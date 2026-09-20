@@ -1,0 +1,9 @@
+# Modèles Whisper : téléchargés par install.sh, trop lourds pour git
+models/
+*.bin
+
+# Artefacts de build
+*.app/
+overlay
+*.o
+.DS_Store
