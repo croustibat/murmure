@@ -33,6 +33,7 @@ LEVELS="$STATE_DIR/levels"   # niveau RMS de la voix, lu par la pastille
 LOG="$STATE_DIR/murmure.log"
 STATUS="$STATE_DIR/status"
 BUSY="$STATE_DIR/transcribing.pid"
+TARGET="$STATE_DIR/target"   # app active au démarrage : « pid bundleid »
 OVERLAY="${MURMURE_OVERLAY:-$MURMURE_HOME/overlay}"
 mkdir -p "$STATE_DIR"
 
@@ -43,6 +44,43 @@ log()    { printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$*" >>"$LOG"; }
 ding()   { afplay "/System/Library/Sounds/$1.aiff" >/dev/null 2>&1 & }
 notify() { osascript -e "display notification \"$1\" with title \"Murmure\"" >/dev/null 2>&1; }
 die()    { rm -f "$STATUS"; log "ERREUR: $*"; ding Basso; notify "$1"; exit 1; }
+
+# App au premier plan, sous la forme « pid bundleid ».
+front_app() {
+  lsappinfo info -only pid -only bundleid "$(lsappinfo front)" 2>/dev/null | awk '
+    /pid = / { sub(/.*pid = /, ""); sub(/ .*/, ""); pid = $0 }
+    /bundleID="/ { sub(/.*bundleID="/, ""); sub(/".*/, ""); id = $0 }
+    END { if (pid) print pid, id }'
+}
+
+# Mémorise la cible du collage. Murmure.app (LSUIElement) et la pastille ne
+# prennent pas le premier plan, mais on écarte Murmure par sécurité.
+remember_target() {
+  local app; app=$(front_app)
+  rm -f "$TARGET"
+  case "$app" in
+    ''|*' dev.croustibat.murmure') log "cible : inconnue" ;;
+    *) printf '%s\n' "$app" >"$TARGET"; log "cible : $app" ;;
+  esac
+}
+
+# Réactive l'app cible si on en a changé pendant la transcription, puis ⌘V.
+# Échoue sans coller si la cible ne revient pas au premier plan.
+paste_into() {
+  local pid=$1 bundle=$2 front
+  front=$(front_app); front=${front%% *}
+  if [ -n "$pid" ] && [ "$front" != "$pid" ]; then
+    log "retour vers $bundle (pid $pid)"
+    osascript -e "tell application \"System Events\" to set frontmost of (first process whose unix id is $pid) to true" \
+      >>"$LOG" 2>&1 || { [ -n "$bundle" ] && open -b "$bundle"; }
+    for _ in $(seq 1 10); do
+      front=$(front_app); [ "${front%% *}" = "$pid" ] && break; sleep 0.05
+    done
+    [ "${front%% *}" = "$pid" ] || { log "cible non réactivée"; return 1; }
+  fi
+  osascript -e 'tell application "System Events" to keystroke "v" using command down' \
+    >>"$LOG" 2>&1
+}
 
 start_recording() {
   [ -x "$FFMPEG_BIN" ] || die "ffmpeg introuvable"
@@ -58,6 +96,7 @@ start_recording() {
       >>"$LOG" 2>&1 &
   echo $! >"$PID_FILE"
   log "capture démarrée (pid $!)"
+  remember_target   # après ffmpeg : ne pas retarder la capture
   ding Tink
 
   printf 'recording' >"$STATUS"
@@ -154,9 +193,15 @@ stop_and_transcribe() {
   printf 'pasting' >"$STATUS"
   printf '%s' "$text" | iconv -f UTF-8 -t UTF-8 | pbcopy
   log "transcrit: $text"
-  osascript -e 'tell application "System Events" to keystroke "v" using command down' \
-    >>"$LOG" 2>&1 || notify "Texte copié — Cmd+V pour coller"
-  rm -f "$STATUS"
+  local pid='' bundle=''
+  read -r pid bundle 2>/dev/null <"$TARGET"
+  if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+    log "app cible quittée ($bundle) : texte laissé dans le presse-papiers"
+    notify "Texte copié — Cmd+V pour coller"
+  else
+    paste_into "$pid" "$bundle" || notify "Texte copié — Cmd+V pour coller"
+  fi
+  rm -f "$STATUS" "$TARGET"
 }
 
 if [ -f "$PID_FILE" ]; then
