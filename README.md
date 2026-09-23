@@ -155,9 +155,10 @@ autre qu'un code comme `fr` ou `auto`) est ignorée et signalée dans le journal
 | `MURMURE_HOLD_MS` | `600` | au-delà, relâcher ⌘⇧E arrête l'écoute (appui maintenu) |
 | `MURMURE_SILENCE_DB` | `-70` | seuil en dessous duquel l'audio est jugé muet |
 | `MURMURE_WHISPER_ARGS` | _(vide)_ | options ajoutées à `whisper-cli`, par exemple `-bs 1 -bo 1` |
+| `MURMURE_SHORTCUT` | `cmd+shift+e` | raccourci global, lu par `Murmure.app` à son lancement (voir « Le raccourci ») |
 
-`MURMURE_SHORTCUT`, `MURMURE_HISTORY` et `MURMURE_RESTORE_CLIPBOARD` sont réservées
-aux versions à venir et encore sans effet.
+`MURMURE_HISTORY` et `MURMURE_RESTORE_CLIPBOARD` sont réservées aux versions à venir
+et encore sans effet.
 
 À l'approche de `MURMURE_MAX` (30 dernières secondes, ou le dernier quart d'une
 durée plus courte), la pastille affiche un compte à rebours ; à la limite, la

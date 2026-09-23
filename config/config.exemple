@@ -32,7 +32,10 @@
 # Options ajoutées à whisper-cli, par exemple : -bs 1 -bo 1
 #MURMURE_WHISPER_ARGS=
 
-# Réservé à des versions à venir, sans effet pour l'instant.
+# Raccourci global, lu par Murmure.app à son lancement (quitter et rouvrir
+# Murmure après modification). Modificateurs cmd, shift, alt, ctrl + une touche.
 #MURMURE_SHORTCUT=cmd+shift+e
+
+# Réservé à des versions à venir, sans effet pour l'instant.
 #MURMURE_HISTORY=0
 #MURMURE_RESTORE_CLIPBOARD=0
