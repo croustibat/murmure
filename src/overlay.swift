@@ -2,10 +2,12 @@ import AppKit
 
 // Murmure — pastille flottante affichée pendant la dictée.
 // Onde animée + libellé + bouton stop + ✕ (annuler). L'état est lu dans un fichier :
-// « recording », « transcribing <durée estimée> », « pasting », et sa
+// « recording <durée max> », « transcribing <durée estimée> », « pasting », et sa
 // disparition ferme la fenêtre. Pendant l'écoute, l'onde suit le niveau RMS
-// qu'écrit ffmpeg dans « levels », à côté du fichier d'état. Pendant la
-// transcription, les points de l'onde servent de jauge et s'allument un à un.
+// qu'écrit ffmpeg dans « levels », à côté du fichier d'état, et le libellé
+// devient un compte à rebours à l'approche de la durée max (début de capture
+// lu dans « started »). Pendant la transcription, les points de l'onde
+// servent de jauge et s'allument un à un.
 
 let statusPath = CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
@@ -14,6 +16,7 @@ let toggleScript = CommandLine.arguments.count > 2
     ? CommandLine.arguments[2]
     : NSString(string: "~/.local/share/murmure/murmure.sh").expandingTildeInPath
 let levelsPath = (statusPath as NSString).deletingLastPathComponent + "/levels"
+let startedPath = (statusPath as NSString).deletingLastPathComponent + "/started"
 
 final class PillView: NSView {
     var phase: CGFloat = 0
@@ -196,6 +199,17 @@ final class Controller: NSObject {
         view.frame = NSRect(x: 0, y: 0, width: w, height: 44)
     }
 
+    // « Encore 25 s » dans les 30 dernières secondes (le dernier quart si la
+    // durée max est inférieure à 2 min), nil avant.
+    func countdown(max: Double?) -> String? {
+        guard let max, max > 0,
+              let raw = try? String(contentsOfFile: startedPath, encoding: .utf8),
+              let t0 = Double(raw.trimmingCharacters(in: .whitespacesAndNewlines)) else { return nil }
+        let left = max - (Date().timeIntervalSince1970 - t0)
+        guard left <= min(30, max / 4) else { return nil }
+        return "Encore \(Int(Swift.max(0, left.rounded(.up)))) s"
+    }
+
     func syncStatus() {
         guard let raw = try? String(contentsOfFile: statusPath, encoding: .utf8) else {
             NSApp.terminate(nil); return
@@ -204,7 +218,7 @@ final class Controller: NSObject {
         let s = parts.first.map(String.init) ?? ""
         if s == "recording" {
             view.listening = true
-            view.label = "Vous parlez"
+            view.label = countdown(max: parts.count > 1 ? Double(parts[1]) : nil) ?? "Vous parlez"
             transcribeStart = nil
         } else if s == "transcribing" {
             view.listening = false

@@ -130,6 +130,12 @@ autre qu'un code comme `fr` ou `auto`) est ignorée et signalée dans le journal
 `MURMURE_SHORTCUT`, `MURMURE_HISTORY` et `MURMURE_RESTORE_CLIPBOARD` sont réservées
 aux versions à venir et encore sans effet.
 
+À l'approche de `MURMURE_MAX` (30 dernières secondes, ou le dernier quart d'une
+durée plus courte), la pastille affiche un compte à rebours ; à la limite, la
+transcription part d'elle-même, comme sur un second appui.
+
+![Compte à rebours avant la durée maximale](docs/apercu-compte-a-rebours.png)
+
 **Le micro** se désigne par son index ou, plus sûrement, par son nom : l'index change
 quand on branche un casque. La liste figure sous « AVFoundation audio devices » :
 
@@ -191,6 +197,9 @@ Le journal dit toujours ce qui s'est passé :
 ```bash
 tail -20 /tmp/murmure-$(id -u)/murmure.log
 ```
+
+La sortie technique de `whisper-cli` n'y figure que lorsqu'il échoue. Au-delà
+d'environ 1 Mo, le journal est renommé `murmure.log.1` et repart de zéro.
 
 | Symptôme | Cause probable |
 |---|---|
