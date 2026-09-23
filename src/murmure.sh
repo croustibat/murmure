@@ -18,7 +18,7 @@ MURMURE_HOME="${MURMURE_HOME:-$HOME/.local/share/murmure}"
 # variable d'environnement. Lignes « CLE=valeur », jamais exécutées (pas de
 # source) : seules les clés connues sont retenues, et une variable
 # d'environnement l'emporte sur le fichier. Les clés réservées (raccourci lu par
-# l'app, historique, presse-papiers) sont acceptées mais pas encore utilisées.
+# l'app, presse-papiers) sont acceptées mais pas encore utilisées.
 CONFIG="$MURMURE_HOME/config"
 CONFIG_KEYS=" MURMURE_LANG MURMURE_DEVICE MURMURE_MAX MURMURE_SILENCE_DB MURMURE_HOLD_MS MURMURE_WHISPER_ARGS MURMURE_SHORTCUT MURMURE_HISTORY MURMURE_RESTORE_CLIPBOARD "
 CONFIG_NOTES=()   # anomalies, journalisées une fois le journal disponible
@@ -46,6 +46,7 @@ load_config() {
       MURMURE_MAX|MURMURE_HOLD_MS) [[ $value =~ ^[0-9]+$ ]] ;;
       MURMURE_SILENCE_DB) [[ $value =~ ^-?[0-9]+$ ]] ;;
       MURMURE_LANG) [[ $value =~ ^[a-z]+$ ]] ;;
+      MURMURE_HISTORY) [[ $value =~ ^[01]$ ]] ;;
     esac || { CONFIG_NOTES+=("config ligne $n ignorée (valeur invalide) : $key=$value"); continue; }
     case "$env_keys" in *" $key "*) continue ;; esac
     printf -v "$key" '%s' "$value"
@@ -85,6 +86,7 @@ WHISPER_ERR="$STATE_DIR/whisper.err"   # sortie d'erreur de whisper-cli
 LOG_MAX="${MURMURE_LOG_MAX:-1048576}"   # au-delà, murmure.log devient murmure.log.1
 HOLD_MS="${MURMURE_HOLD_MS:-600}" # au-delà, relâcher la touche arrête la capture
 OVERLAY="${MURMURE_OVERLAY:-$MURMURE_HOME/overlay}"
+HISTORIQUE="$MURMURE_HOME/historique.jsonl"   # dernières dictées, lues par le menu
 mkdir -p "$STATE_DIR"
 
 # Calculs décimaux en locale C : en fr_FR, awk écrirait « 5,36 ».
@@ -219,6 +221,31 @@ has_speech() {
   printf '%s' "$1" | grep -qE '[[:alpha:]]'
 }
 
+# Ajoute la dictée à l'historique (une ligne JSON par dictée, 100 au plus, les
+# plus anciennes supprimées). JSON::PP échappe guillemets et retours ligne ;
+# réécriture dans un fichier temporaire puis renommage, lecture comprise par le
+# menu. Local uniquement : MURMURE_HISTORY=0 n'écrit rien.
+# $1 texte, $2 taille du WAV en octets, $3 bundle id de l'app cible.
+add_history() {
+  [ "${MURMURE_HISTORY:-1}" = 0 ] && return 0
+  HIST_TEXTE=$1 HIST_OCTETS=$2 HIST_APP=$3 perl -MJSON::PP -MPOSIX=strftime -e '
+    my $f = shift;
+    my $texte = $ENV{HIST_TEXTE}; utf8::decode($texte);
+    (my $date = strftime("%Y-%m-%dT%H:%M:%S%z", localtime)) =~ s/(\d\d)$/:$1/;
+    my @l;
+    if (open my $in, "<", $f) { @l = map { s/\n?\z/\n/r } grep { /\S/ } <$in>; close $in }
+    push @l, JSON::PP->new->utf8->canonical->encode({
+      date => $date, texte => $texte, app => $ENV{HIST_APP} || undef,
+      duree_audio_s => 0 + sprintf("%.1f", ($ENV{HIST_OCTETS} - 44) / 32000),
+    }) . "\n";
+    splice @l, 0, @l - 100 if @l > 100;
+    umask 077;
+    open my $out, ">", "$f.$$" or die "$f.$$ : $!\n";
+    print $out @l; close $out or die "$f.$$ : $!\n";
+    rename "$f.$$", $f or die "$f : $!\n";
+  ' "$HISTORIQUE" 2>>"$LOG" || log "historique : écriture impossible"
+}
+
 stop_and_transcribe() {
   # Verrou posé juste après la réclamation : un nouvel appui pendant la
   # transcription ne doit pas relancer une capture par-dessus.
@@ -305,6 +332,7 @@ stop_and_transcribe() {
     paste_into "$pid" "$bundle" || notify "Texte copié — Cmd+V pour coller"
   fi
   rm -f "$STATUS" "$TARGET"
+  add_history "$text" "$bytes" "$bundle"   # après le collage : ne pas le retarder
 }
 
 # Annulation : on coupe l'écoute, rien n'est transcrit ni collé.

@@ -14,6 +14,7 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let ligneRaccourci = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let bascule = NSMenuItem(title: "Démarrer la dictée", action: #selector(basculer), keyEquivalent: "")
     private let demarrage = NSMenuItem(title: "Ouvrir au démarrage", action: #selector(changerDemarrage), keyEquivalent: "")
+    private let historique = Historique()
     private var raccourcis: Raccourcis!
     private var etat: Etat?
     private var enfonce = false   // touche du raccourci actuellement enfoncée
@@ -34,9 +35,8 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ligneRaccourci.isEnabled = false
         bascule.target = self
         demarrage.target = self
-        // Emplacements réservés, remplis par les prochaines versions.
-        let dernieres = NSMenuItem(title: "Dernières dictées", action: nil, keyEquivalent: "")
-        dernieres.isEnabled = false
+        let dernieres = historique.item
+        // Emplacement réservé, rempli par une prochaine version.
         let reglages = NSMenuItem(title: "Réglages…", action: nil, keyEquivalent: "")
         reglages.isEnabled = false
         let journalItem = NSMenuItem(title: "Ouvrir le journal", action: #selector(ouvrirJournal), keyEquivalent: "")

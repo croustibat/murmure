@@ -36,6 +36,9 @@
 # Murmure après modification). Modificateurs cmd, shift, alt, ctrl + une touche.
 #MURMURE_SHORTCUT=cmd+shift+e
 
-# Réservé à des versions à venir, sans effet pour l'instant.
-#MURMURE_HISTORY=0
+# Historique des dernières dictées (menu « Dernières dictées »), gardé sur ce
+# Mac dans historique.jsonl, jamais envoyé nulle part. 0 : rien n'est enregistré.
+#MURMURE_HISTORY=1
+
+# Réservé à une version à venir, sans effet pour l'instant.
 #MURMURE_RESTORE_CLIPBOARD=0
