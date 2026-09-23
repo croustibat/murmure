@@ -40,6 +40,13 @@ cd murmure
 L'installeur pose `ffmpeg` et `whisper-cpp`, télécharge le modèle (~550 Mo, une fois),
 compile la pastille, crée `~/Applications/Murmure.app` et dépose la règle de raccourci.
 
+Pour mettre à jour, `git pull` puis `./install.sh` à nouveau. L'installeur ne remplace
+que ce qui a changé et l'annonce en fin d'installation : tant que `Murmure.app` est
+inchangée, elle n'est ni recréée ni re-signée et macOS conserve les autorisations.
+Le modèle est vérifié par son empreinte SHA-256 ; un téléchargement interrompu reprend
+au lancement suivant. `./install.sh --verify` recalcule l'empreinte d'un modèle déjà
+présent et le retélécharge s'il est corrompu.
+
 ### Les deux autorisations
 
 Au premier usage, macOS demande l'accès au **micro** : acceptez.
@@ -141,6 +148,9 @@ tail -20 /tmp/murmure-$(id -u)/murmure.log
 | Texte copié mais pas collé | `Murmure.app` absent de la liste Accessibilité |
 | Accents cassés (`Soci√©t√©`) | locale non UTF-8 dans l'environnement du raccourci |
 | Première dictée très lente | chargement du modèle et des shaders Metal ; les suivantes sont rapides |
+| ⌘⇧E lance une autre app, ou une ancienne version | une autre règle ⌘⇧E active dans Karabiner : `./install.sh` la signale, retirez-la dans Complex Modifications |
+| Autorisations à redonner après une mise à jour | `Murmure.app` a changé (l'installeur l'indique) : macOS voit une nouvelle signature |
+| Erreur de modèle au lancement de Whisper | fichier abîmé : `./install.sh --verify` |
 
 ## Désinstallation
 
