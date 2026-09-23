@@ -97,8 +97,54 @@ Tout se règle dans `~/.local/share/murmure/` :
 
 | Fichier | Rôle |
 |---|---|
+| `config` | réglages : langue, micro, durées… |
 | `vocabulaire.txt` | termes soufflés à Whisper avant la transcription |
 | `corrections.txt` | remplacements appliqués après, au format `entendu\|voulu` |
+
+### Le fichier `config`
+
+L'installeur le dépose avec toutes les clés en commentaire, à leur valeur par défaut,
+et ne l'écrase jamais ensuite. Pour changer un réglage, retirez le `#` et modifiez la
+valeur ; il s'applique à la dictée suivante, sans rien relancer :
+
+```
+MURMURE_LANG=en
+MURMURE_DEVICE=MacBook Pro Microphone
+MURMURE_HOLD_MS=800
+```
+
+Une ligne par réglage, `CLE=valeur`, sans guillemets (tolérés et retirés) ; `#` en
+début de ligne pour commenter. Le fichier est lu, jamais exécuté : une clé inconnue,
+une ligne malformée ou une valeur invalide (durée qui n'est pas un nombre, langue
+autre qu'un code comme `fr` ou `auto`) est ignorée et signalée dans le journal.
+
+| Clé | Défaut | Rôle |
+|---|---|---|
+| `MURMURE_LANG` | `fr` | langue de transcription |
+| `MURMURE_DEVICE` | `:0` | micro : index ou nom (voir ci-dessous) |
+| `MURMURE_MAX` | `300` | durée maximale d'un enregistrement, en secondes |
+| `MURMURE_HOLD_MS` | `600` | au-delà, relâcher ⌘⇧E arrête l'écoute (appui maintenu) |
+| `MURMURE_SILENCE_DB` | `-70` | seuil en dessous duquel l'audio est jugé muet |
+| `MURMURE_WHISPER_ARGS` | _(vide)_ | options ajoutées à `whisper-cli`, par exemple `-bs 1 -bo 1` |
+
+`MURMURE_SHORTCUT`, `MURMURE_HISTORY` et `MURMURE_RESTORE_CLIPBOARD` sont réservées
+aux versions à venir et encore sans effet.
+
+**Le micro** se désigne par son index ou, plus sûrement, par son nom : l'index change
+quand on branche un casque. La liste figure sous « AVFoundation audio devices » :
+
+```bash
+ffmpeg -f avfoundation -list_devices true -i ""
+```
+
+Le nom exact est cherché d'abord (casse ignorée), puis un nom qui le contient. S'il
+n'est pas trouvé, Murmure prend le micro `:0` et le note dans le journal.
+
+Une variable d'environnement du même nom l'emporte sur le fichier, pratique pour un
+essai depuis le terminal : `MURMURE_LANG=en ~/.local/share/murmure/murmure.sh`.
+Lancé par le raccourci, Murmure ne reçoit aucune variable : seul le fichier compte.
+
+### Corrections
 
 `corrections.txt` est l'outil efficace. Une règle par ligne, insensible à la casse,
 sur mots entiers :
@@ -108,17 +154,6 @@ commis|commit
 redit|Redis
 worktrade|worktree
 ```
-
-Quelques variables d'environnement permettent d'ajuster le reste :
-
-| Variable | Défaut | Rôle |
-|---|---|---|
-| `MURMURE_LANG` | `fr` | langue de transcription |
-| `MURMURE_DEVICE` | `:0` | index du micro (`ffmpeg -f avfoundation -list_devices true -i ""`) |
-| `MURMURE_MAX` | `300` | durée maximale d'un enregistrement, en secondes |
-| `MURMURE_HOLD_MS` | `600` | au-delà, relâcher ⌘⇧E arrête l'écoute (appui maintenu) |
-| `MURMURE_SILENCE_DB` | `-70` | seuil en dessous duquel l'audio est jugé muet |
-| `MURMURE_WHISPER_ARGS` | _(vide)_ | options ajoutées à `whisper-cli`, par exemple `-bs 1 -bo 1` |
 
 ### Vitesse de transcription
 

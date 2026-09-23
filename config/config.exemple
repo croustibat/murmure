@@ -1,0 +1,38 @@
+# Murmure — réglages.
+#
+# Une ligne « CLE=valeur » par réglage, sans guillemets (tolérés et retirés).
+# Les lignes commençant par # sont ignorées : retirez le # pour activer une
+# ligne. Un commentaire ne se met pas en fin de ligne, il ferait partie de la
+# valeur. Les valeurs indiquées sont les valeurs par défaut.
+#
+# Ce fichier est lu à chaque dictée, jamais exécuté. Une variable
+# d'environnement du même nom l'emporte sur lui. Une ligne invalide est
+# ignorée et signalée dans le journal (/tmp/murmure-<uid>/murmure.log).
+
+# Langue de transcription (fr, en, es, de, it… ou auto).
+#MURMURE_LANG=fr
+
+# Micro : un index (« :0 », « :1 »…) ou un nom, plus robuste car l'index change
+# quand on branche un casque. Liste des micros :
+#   ffmpeg -f avfoundation -list_devices true -i ""
+# (section « AVFoundation audio devices »). Nom introuvable : micro :0.
+#MURMURE_DEVICE=:0
+#MURMURE_DEVICE=MacBook Pro Microphone
+
+# Durée maximale d'un enregistrement, en secondes.
+#MURMURE_MAX=300
+
+# Au-delà de ce délai (ms), relâcher le raccourci arrête l'écoute
+# (appui maintenu) ; en deçà, l'appui bascule.
+#MURMURE_HOLD_MS=600
+
+# Seuil (dB) en dessous duquel l'audio est jugé muet.
+#MURMURE_SILENCE_DB=-70
+
+# Options ajoutées à whisper-cli, par exemple : -bs 1 -bo 1
+#MURMURE_WHISPER_ARGS=
+
+# Réservé à des versions à venir, sans effet pour l'instant.
+#MURMURE_SHORTCUT=cmd+shift+e
+#MURMURE_HISTORY=0
+#MURMURE_RESTORE_CLIPBOARD=0

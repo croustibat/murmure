@@ -13,6 +13,46 @@ export LC_ALL="${LC_ALL:-fr_FR.UTF-8}"
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 MURMURE_HOME="${MURMURE_HOME:-$HOME/.local/share/murmure}"
+
+# Réglages lus dans $MURMURE_HOME/config : le raccourci ne transmet aucune
+# variable d'environnement. Lignes « CLE=valeur », jamais exécutées (pas de
+# source) : seules les clés connues sont retenues, et une variable
+# d'environnement l'emporte sur le fichier. Les clés réservées (raccourci lu par
+# l'app, historique, presse-papiers) sont acceptées mais pas encore utilisées.
+CONFIG="$MURMURE_HOME/config"
+CONFIG_KEYS=" MURMURE_LANG MURMURE_DEVICE MURMURE_MAX MURMURE_SILENCE_DB MURMURE_HOLD_MS MURMURE_WHISPER_ARGS MURMURE_SHORTCUT MURMURE_HISTORY MURMURE_RESTORE_CLIPBOARD "
+CONFIG_NOTES=()   # anomalies, journalisées une fois le journal disponible
+load_config() {
+  [ -r "$CONFIG" ] || return 0
+  local env_keys=' ' key line value n=0
+  for key in $CONFIG_KEYS; do
+    [ -n "${!key+x}" ] && env_keys+="$key "
+  done
+  while IFS= read -r line || [ -n "$line" ]; do
+    n=$((n + 1)); line=${line%$'\r'}
+    [[ $line =~ ^[[:space:]]*(#|$) ]] && continue
+    if ! [[ $line =~ ^[[:space:]]*(MURMURE_[A-Z_]+)[[:space:]]*=[[:space:]]*(.*[^[:space:]])?[[:space:]]*$ ]]; then
+      CONFIG_NOTES+=("config ligne $n ignorée (malformée) : $line"); continue
+    fi
+    key=${BASH_REMATCH[1]} value=${BASH_REMATCH[2]}
+    case "$CONFIG_KEYS" in
+      *" $key "*) ;;
+      *) CONFIG_NOTES+=("config ligne $n ignorée (clé inconnue) : $key"); continue ;;
+    esac
+    case "$value" in
+      \"*\"|\'*\') value=${value:1:${#value}-2} ;;   # guillemets tolérés
+    esac
+    case "$key" in
+      MURMURE_MAX|MURMURE_HOLD_MS) [[ $value =~ ^[0-9]+$ ]] ;;
+      MURMURE_SILENCE_DB) [[ $value =~ ^-?[0-9]+$ ]] ;;
+      MURMURE_LANG) [[ $value =~ ^[a-z]+$ ]] ;;
+    esac || { CONFIG_NOTES+=("config ligne $n ignorée (valeur invalide) : $key=$value"); continue; }
+    case "$env_keys" in *" $key "*) continue ;; esac
+    printf -v "$key" '%s' "$value"
+  done <"$CONFIG"
+}
+load_config
+
 MODEL_NAME="${MURMURE_MODEL_NAME:-ggml-large-v3-turbo-q5_0.bin}"
 
 WHISPER_BIN="${MURMURE_WHISPER:-/opt/homebrew/bin/whisper-cli}"
@@ -53,6 +93,8 @@ log()    { printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$*" >>"$LOG"; }
 ding()   { afplay "/System/Library/Sounds/$1.aiff" >/dev/null 2>&1 & }
 notify() { osascript -e "display notification \"$1\" with title \"Murmure\"" >/dev/null 2>&1; }
 die()    { rm -f "$STATUS"; listening 0; log "ERREUR: $*"; ding Basso; notify "$1"; exit 1; }
+
+for note in ${CONFIG_NOTES[@]+"${CONFIG_NOTES[@]}"}; do log "$note"; done
 
 # Variable Karabiner lue par la règle Échap : la touche n'est interceptée que
 # pendant l'écoute. Sans Karabiner, sans effet.
@@ -114,9 +156,35 @@ paste_into() {
     >>"$LOG" 2>&1
 }
 
+# MURMURE_DEVICE accepte un index avfoundation (« :0 ») ou un nom de micro,
+# résolu ici en index : l'index change quand on branche un casque, pas le nom.
+# Nom exact (casse ignorée), sinon premier micro dont le nom le contient.
+resolve_device() {
+  case "$DEVICE" in *[!0-9:]*) ;; *) return 0 ;; esac
+  local name=${DEVICE#:} index
+  index=$("$FFMPEG_BIN" -hide_banner -f avfoundation -list_devices true -i "" 2>&1 \
+    | awk -v want="$name" '
+      /AVFoundation audio devices:/ { audio = 1; next }
+      /AVFoundation video devices:/ { audio = 0; next }
+      audio && sub(/^\[[^]]*\] \[/, "") {
+        i = $0; sub(/\].*/, "", i); n = $0; sub(/^[0-9]+\] /, "", n)
+        if (tolower(n) == tolower(want)) { if (exact == "") exact = i }
+        else if (index(tolower(n), tolower(want)) && part == "") part = i
+      }
+      END { print (exact != "" ? exact : part) }')
+  if [ -n "$index" ]; then
+    log "micro « $name » : index $index"
+    DEVICE=":$index"
+  else
+    log "micro « $name » introuvable : micro par défaut"
+    DEVICE=":0"
+  fi
+}
+
 start_recording() {
   [ -x "$FFMPEG_BIN" ] || die "ffmpeg introuvable"
   [ -f "$MODEL" ]      || die "Modèle Whisper introuvable"
+  resolve_device
   rm -f "$WAV" "$LEVELS"
   # Niveau RMS écrit 20 fois par seconde (trames de 800 échantillons à 16 kHz)
   # pour l'onde de la pastille ; astats ne modifie pas l'audio enregistré.
