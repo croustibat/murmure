@@ -16,6 +16,7 @@
 # quand on branche un casque. Liste des micros :
 #   ffmpeg -f avfoundation -list_devices true -i ""
 # (section « AVFoundation audio devices »). Nom introuvable : micro :0.
+# « :default » suit le micro par défaut du système.
 #MURMURE_DEVICE=:0
 #MURMURE_DEVICE=MacBook Pro Microphone
 
@@ -33,7 +34,8 @@
 #MURMURE_WHISPER_ARGS=
 
 # Raccourci global, lu par Murmure.app à son lancement (quitter et rouvrir
-# Murmure après modification). Modificateurs cmd, shift, alt, ctrl + une touche.
+# Murmure après modification à la main ; appliqué aussitôt depuis Réglages…).
+# Modificateurs cmd, shift, alt, ctrl + une touche.
 #MURMURE_SHORTCUT=cmd+shift+e
 
 # Historique des dernières dictées (menu « Dernières dictées »), gardé sur ce

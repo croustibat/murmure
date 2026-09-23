@@ -157,8 +157,9 @@ paste_into() {
 # MURMURE_DEVICE accepte un index avfoundation (« :0 ») ou un nom de micro,
 # résolu ici en index : l'index change quand on branche un casque, pas le nom.
 # Nom exact (casse ignorée), sinon premier micro dont le nom le contient.
+# « :default » (micro par défaut du système) est compris tel quel par ffmpeg.
 resolve_device() {
-  case "$DEVICE" in *[!0-9:]*) ;; *) return 0 ;; esac
+  case "$DEVICE" in :default) return 0 ;; *[!0-9:]*) ;; *) return 0 ;; esac
   local name=${DEVICE#:} index
   index=$("$FFMPEG_BIN" -hide_banner -f avfoundation -list_devices true -i "" 2>&1 \
     | awk -v want="$name" '
