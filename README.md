@@ -101,6 +101,13 @@ donne l'état et le raccourci, démarre ou arrête une dictée, ouvre le journal
 la version, et propose **Ouvrir au démarrage** pour lancer Murmure à l'ouverture de
 session. Murmure ne garde aucun modèle en mémoire entre deux dictées.
 
+**Dernières dictées** liste les 10 plus récentes, avec leur heure ; un clic copie le
+texte dans le presse-papiers, pratique quand le collage a échoué ou pour réutiliser
+une dictée. **Effacer l'historique** vide la liste. L'historique est gardé dans
+`~/.local/share/murmure/historique.jsonl` (100 dictées au plus, les plus anciennes
+supprimées) : il reste sur ce Mac et n'est jamais envoyé nulle part.
+`MURMURE_HISTORY=0` dans le fichier `config` n'enregistre plus rien.
+
 ## Utilisation
 
 Deux modes, sans réglage :
@@ -156,9 +163,9 @@ autre qu'un code comme `fr` ou `auto`) est ignorée et signalée dans le journal
 | `MURMURE_SILENCE_DB` | `-70` | seuil en dessous duquel l'audio est jugé muet |
 | `MURMURE_WHISPER_ARGS` | _(vide)_ | options ajoutées à `whisper-cli`, par exemple `-bs 1 -bo 1` |
 | `MURMURE_SHORTCUT` | `cmd+shift+e` | raccourci global, lu par `Murmure.app` à son lancement (voir « Le raccourci ») |
+| `MURMURE_HISTORY` | `1` | `0` : les dictées ne sont plus enregistrées dans l'historique (voir « Le menu ») |
 
-`MURMURE_HISTORY` et `MURMURE_RESTORE_CLIPBOARD` sont réservées aux versions à venir
-et encore sans effet.
+`MURMURE_RESTORE_CLIPBOARD` est réservée à une version à venir et encore sans effet.
 
 À l'approche de `MURMURE_MAX` (30 dernières secondes, ou le dernier quart d'une
 durée plus courte), la pastille affiche un compte à rebours ; à la limite, la
