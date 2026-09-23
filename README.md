@@ -130,8 +130,9 @@ Vous pouvez aussi cliquer le carré de la pastille pour arrêter et transcrire.
 L'enregistrement est jeté, rien n'est collé. Échap n'est intercepté que pendant
 l'écoute : le reste du temps, il garde son rôle normal dans toutes les applications.
 
-Le presse-papiers contient toujours la dernière transcription : si le collage échoue,
-⌘V la récupère.
+Le presse-papiers contient la dernière transcription : si le collage échoue, ⌘V la
+récupère. Pour retrouver plutôt ce que vous aviez copié avant la dictée, activez
+`MURMURE_RESTORE_CLIPBOARD` (voir ci-dessous).
 
 ## Configuration
 
@@ -171,8 +172,27 @@ autre qu'un code comme `fr` ou `auto`) est ignorée et signalée dans le journal
 | `MURMURE_SHORTCUT` | `cmd+shift+e` | raccourci global, lu par `Murmure.app` à son lancement (voir « Le raccourci ») |
 | `MURMURE_HISTORY` | `1` | `0` : les dictées ne sont plus enregistrées dans l'historique (voir « Le menu ») |
 | `MURMURE_CHECK_UPDATES` | `1` | `0` coupe la vérification des nouvelles versions, lu par `Murmure.app` à son lancement (voir « Réseau ») |
+| `MURMURE_RESTORE_CLIPBOARD` | `0` | `1` : remet le presse-papiers d'origine après le collage (voir ci-dessous) |
 
-`MURMURE_RESTORE_CLIPBOARD` est réservée à une version à venir et encore sans effet.
+**Restaurer le presse-papiers.** Avec `MURMURE_RESTORE_CLIPBOARD=1`, Murmure
+sauvegarde le presse-papiers juste avant de coller — ce que vous copiez pendant
+l'écoute compte donc — puis le remet 0,4 s après le ⌘V. Tous les types sont
+conservés : texte, texte mis en forme, images, fichiers copiés dans le Finder. Rien
+n'est restauré, et la dictée reste au presse-papiers, quand :
+
+- le collage a échoué (app cible quittée, autorisation Accessibilité absente) : c'est
+  alors le seul moyen de la récupérer ;
+- vous avez copié autre chose dans l'intervalle : votre copie prime ;
+- le presse-papiers était vide, ou marqué confidentiel par un gestionnaire de mots de
+  passe (le remettre empêcherait son effacement programmé) ;
+- le contenu dépasse 64 Mo, ou macOS en refuse la lecture.
+
+Limites : le contenu est lu en entier au moment du collage, ce qui peut le retarder
+un peu pour une grosse image. Une fois restauré, il n'appartient plus à l'app
+d'origine : les options qui en dépendent (collage spécial d'Office, par exemple)
+peuvent disparaître. Au premier usage, macOS peut demander si Murmure a le droit de
+lire le presse-papiers : sans cet accord, rien n'est restauré (réglable ensuite dans
+**Réglages > Confidentialité et sécurité**).
 
 À l'approche de `MURMURE_MAX` (30 dernières secondes, ou le dernier quart d'une
 durée plus courte), la pastille affiche un compte à rebours ; à la limite, la

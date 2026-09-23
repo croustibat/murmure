@@ -45,5 +45,6 @@
 # n'est envoyé). 0 pour la désactiver ; lu par Murmure.app à son lancement.
 #MURMURE_CHECK_UPDATES=1
 
-# Réservé à une version à venir, sans effet pour l'instant.
+# 1 : après le collage, le presse-papiers retrouve ce qu'il contenait avant la
+# dictée (texte, images, fichiers…). 0 : la dictée y reste, prête pour ⌘V.
 #MURMURE_RESTORE_CLIPBOARD=0
