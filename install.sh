@@ -75,6 +75,14 @@ for f in vocabulaire corrections; do
     install -m 644 "$SRC/config/$f.txt" "$MURMURE_HOME/$f.txt"
   fi
 done
+# Réglages : déposés une seule fois, jamais écrasés (édités à la main ou par
+# l'app). Toutes les clés y figurent en commentaire, valeurs par défaut.
+if [ -f "$MURMURE_HOME/config" ]; then
+  note "config : conservé"
+else
+  install -m 644 "$SRC/config/config.exemple" "$MURMURE_HOME/config"
+  note "config : installé"
+fi
 ok "scripts et configuration en place"
 
 # swiftc ne produit pas deux fois le même binaire : on compare l'empreinte de la
