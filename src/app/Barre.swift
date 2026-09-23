@@ -21,6 +21,8 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var enfonce = false   // touche du raccourci actuellement enfoncée
     private var surveillance: DispatchSourceFileSystemObject?
     private var releve: Timer?
+    private lazy var reglages = FenetreReglages(suspendreRaccourci: { [unowned self] in raccourcis.retirer(Barre.idDictee) },
+                                                appliquerRaccourci: { [unowned self] in enregistrerRaccourci() })
 
     func applicationDidFinishLaunching(_ note: Notification) {
         raccourcis = Raccourcis { [weak self] id, appuye in self?.touche(id, appuye) }
@@ -38,9 +40,8 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         bascule.target = self
         demarrage.target = self
         let dernieres = historique.item
-        // Emplacement réservé, rempli par une prochaine version.
-        let reglages = NSMenuItem(title: "Réglages…", action: nil, keyEquivalent: "")
-        reglages.isEnabled = false
+        let reglages = NSMenuItem(title: "Réglages…", action: #selector(ouvrirReglages), keyEquivalent: ",")
+        reglages.target = self
         let journalItem = NSMenuItem(title: "Ouvrir le journal", action: #selector(ouvrirJournal), keyEquivalent: "")
         journalItem.target = self
         let versionItem = NSMenuItem(title: "Murmure \(versionMurmure)", action: nil, keyEquivalent: "")
@@ -57,7 +58,8 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     // MURMURE_SHORTCUT (environnement ou config), sinon ⌘⇧E.
-    private func enregistrerRaccourci() {
+    @discardableResult
+    private func enregistrerRaccourci() -> Bool {
         var r = Raccourci.defaut
         if let texte = reglage("MURMURE_SHORTCUT") {
             if let lu = Raccourci(texte: texte) {
@@ -69,10 +71,11 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if raccourcis.enregistrer(Barre.idDictee, r) {
             ligneRaccourci.title = "Raccourci : \(r.libelle)"
             journal("raccourci \(r.libelle) enregistré")
-        } else {
-            ligneRaccourci.title = "Raccourci \(r.libelle) indisponible"
-            journal("raccourci \(r.libelle) refusé par le système (déjà utilisé ?)")
+            return true
         }
+        ligneRaccourci.title = "Raccourci \(r.libelle) indisponible"
+        journal("raccourci \(r.libelle) refusé par le système (déjà utilisé ?)")
+        return false
     }
 
     private func touche(_ id: UInt32, _ appuye: Bool) {
@@ -155,6 +158,8 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         demarrage.state = Demarrage.actif ? .on : .off
     }
+
+    @objc private func ouvrirReglages() { reglages.montrer() }
 
     @objc private func ouvrirJournal() {
         if !FileManager.default.fileExists(atPath: logPath) {

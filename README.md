@@ -70,7 +70,10 @@ Karabiner), macOS redemande ces deux autorisations **une fois** : l'app est nouv
 global, **⌘⇧E** par défaut — et non ⌘E, qui priverait le Finder de « Éjecter ».
 Aucun outil tiers n'est nécessaire, ni l'autorisation « Surveillance de l'entrée ».
 
-Pour en changer, ajoutez une ligne `MURMURE_SHORTCUT` dans
+Pour en changer, le plus simple est **Réglages…** dans le menu : cliquez le raccourci
+puis tapez la nouvelle combinaison, appliquée aussitôt (sans ⌘, ⌃ ni ⌥, elle est
+refusée ; déjà prise par une autre app, elle est signalée et l'ancienne conservée).
+À la main, ajoutez une ligne `MURMURE_SHORTCUT` dans
 `~/.local/share/murmure/config`, puis quittez et rouvrez Murmure :
 
 ```
@@ -113,6 +116,14 @@ une dictée. **Effacer l'historique** vide la liste. L'historique est gardé dan
 `~/.local/share/murmure/historique.jsonl` (100 dictées au plus, les plus anciennes
 supprimées) : il reste sur ce Mac et n'est jamais envoyé nulle part.
 `MURMURE_HISTORY=0` dans le fichier `config` n'enregistre plus rien.
+
+**Réglages…** (⌘,) ouvre une fenêtre pour le raccourci, le micro (par son nom, ou
+celui du système), la langue, le seuil d'appui maintenu, la durée maximale,
+l'historique, la restauration du presse-papiers et le lancement au démarrage. Elle
+écrit dans le fichier `config` (voir plus bas) en ne touchant que la ligne du réglage
+modifié : vos commentaires et les autres clés sont conservés.
+
+![Fenêtre de réglages](docs/apercu-reglages.png)
 
 ## Utilisation
 
@@ -209,6 +220,7 @@ ffmpeg -f avfoundation -list_devices true -i ""
 
 Le nom exact est cherché d'abord (casse ignorée), puis un nom qui le contient. S'il
 n'est pas trouvé, Murmure prend le micro `:0` et le note dans le journal.
+`MURMURE_DEVICE=:default` suit le micro choisi dans les réglages du système.
 
 Une variable d'environnement du même nom l'emporte sur le fichier, pratique pour un
 essai depuis le terminal : `MURMURE_LANG=en ~/.local/share/murmure/murmure.sh`.
