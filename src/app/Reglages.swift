@@ -150,6 +150,8 @@ final class FenetreReglages: NSObject, NSWindowDelegate {
     private let pressePapiers = NSButton(checkboxWithTitle: "Restaurer le presse-papiers après le collage",
                                          target: nil, action: nil)
     private let demarrage = NSButton(checkboxWithTitle: "Ouvrir Murmure à l'ouverture de session", target: nil, action: nil)
+    private let misesAJour = NSButton(checkboxWithTitle: "Vérifier les nouvelles versions (une fois par jour)",
+                                      target: nil, action: nil)
     private var ecoute: Any?   // moniteur local pendant l'enregistrement du raccourci
     private var enAttente: [String: String] = [:]
 
@@ -220,7 +222,7 @@ final class FenetreReglages: NSObject, NSWindowDelegate {
         duree.numberOfTickMarks = 10
         duree.allowsTickMarkValuesOnly = true
         for (b, a) in [(historique, #selector(changerHistorique)), (pressePapiers, #selector(changerPressePapiers)),
-                       (demarrage, #selector(changerDemarrage))] {
+                       (demarrage, #selector(changerDemarrage)), (misesAJour, #selector(changerMisesAJour))] {
             b.target = self; b.action = a
         }
 
@@ -244,6 +246,7 @@ final class FenetreReglages: NSObject, NSWindowDelegate {
             [etiquette("Historique :"), historique],
             [etiquette("Presse-papiers :"), pressePapiers],
             [etiquette("Démarrage :"), demarrage],
+            [etiquette("Mises à jour :"), misesAJour],
         ])
         grille.column(at: 0).xPlacement = .trailing
         grille.rowAlignment = .firstBaseline
@@ -334,6 +337,7 @@ final class FenetreReglages: NSObject, NSWindowDelegate {
         historique.state = v("MURMURE_HISTORY") == "0" ? .off : .on
         pressePapiers.state = v("MURMURE_RESTORE_CLIPBOARD") == "1" ? .on : .off
         demarrage.state = Demarrage.actif ? .on : .off
+        misesAJour.state = v("MURMURE_CHECK_UPDATES") == "0" ? .off : .on
     }
 
     private func afficherRaccourci() {
@@ -397,6 +401,8 @@ final class FenetreReglages: NSObject, NSWindowDelegate {
         enAttente = [:]
     }
 
+    // Lu par l'app à son lancement : pris en compte au prochain démarrage.
+    @objc private func changerMisesAJour() { ecrire("MURMURE_CHECK_UPDATES", misesAJour.state == .on ? "1" : "0") }
     @objc private func changerHistorique() { ecrire("MURMURE_HISTORY", historique.state == .on ? "1" : "0") }
 
     @objc private func changerPressePapiers() {
