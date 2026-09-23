@@ -67,6 +67,7 @@ func lancer(_ commande: String, fin: (() -> Void)? = nil) {
     p.arguments = [commande]
     var env = ProcessInfo.processInfo.environment
     env["MURMURE_HOME"] = murmureHome
+    env["MURMURE_APP"] = Bundle.main.executablePath   // utilitaire presse-papiers
     p.environment = env
     p.terminationHandler = { _ in DispatchQueue.main.async { fin?() } }
     do { try p.run() } catch { journal("lancement de \(script) impossible : \(error.localizedDescription)") }
@@ -83,6 +84,7 @@ enum Principal {
             // Mode compatibilité : le script remplace ce processus, qui reste
             // le processus responsable aux yeux de macOS (Micro, Accessibilité).
             setenv("MURMURE_HOME", murmureHome, 1)
+            if let app = Bundle.main.executablePath { setenv("MURMURE_APP", app, 1) }
             let argv: [UnsafeMutablePointer<CChar>?] = [strdup(script), strdup(cmd), nil]
             execv(script, argv)
             journal("exécution de \(script) impossible : \(String(cString: strerror(errno)))")
@@ -90,6 +92,9 @@ enum Principal {
         }
         if args.first == "--demarrage" {
             exit(Demarrage.ligneDeCommande(Array(args.dropFirst())))
+        }
+        if args.first == "--presse-papiers" {
+            exit(PressePapiers.ligneDeCommande(Array(args.dropFirst())))
         }
         if let a = args.first {
             journal("argument inconnu : \(a)")

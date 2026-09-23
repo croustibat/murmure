@@ -17,8 +17,8 @@ MURMURE_HOME="${MURMURE_HOME:-$HOME/.local/share/murmure}"
 # Réglages lus dans $MURMURE_HOME/config : le raccourci ne transmet aucune
 # variable d'environnement. Lignes « CLE=valeur », jamais exécutées (pas de
 # source) : seules les clés connues sont retenues, et une variable
-# d'environnement l'emporte sur le fichier. Les clés réservées (raccourci lu par
-# l'app, presse-papiers) sont acceptées mais pas encore utilisées.
+# d'environnement l'emporte sur le fichier. MURMURE_SHORTCUT, lue par l'app,
+# est acceptée mais ignorée ici.
 CONFIG="$MURMURE_HOME/config"
 CONFIG_KEYS=" MURMURE_LANG MURMURE_DEVICE MURMURE_MAX MURMURE_SILENCE_DB MURMURE_HOLD_MS MURMURE_WHISPER_ARGS MURMURE_SHORTCUT MURMURE_HISTORY MURMURE_RESTORE_CLIPBOARD MURMURE_CHECK_UPDATES "
 CONFIG_NOTES=()   # anomalies, journalisées une fois le journal disponible
@@ -46,7 +46,7 @@ load_config() {
       MURMURE_MAX|MURMURE_HOLD_MS) [[ $value =~ ^[0-9]+$ ]] ;;
       MURMURE_SILENCE_DB) [[ $value =~ ^-?[0-9]+$ ]] ;;
       MURMURE_LANG) [[ $value =~ ^[a-z]+$ ]] ;;
-      MURMURE_HISTORY) [[ $value =~ ^[01]$ ]] ;;
+      MURMURE_HISTORY|MURMURE_RESTORE_CLIPBOARD) [[ $value =~ ^[01]$ ]] ;;
     esac || { CONFIG_NOTES+=("config ligne $n ignorée (valeur invalide) : $key=$value"); continue; }
     case "$env_keys" in *" $key "*) continue ;; esac
     printf -v "$key" '%s' "$value"
@@ -87,6 +87,9 @@ LOG_MAX="${MURMURE_LOG_MAX:-1048576}"   # au-delà, murmure.log devient murmure.
 HOLD_MS="${MURMURE_HOLD_MS:-600}" # au-delà, relâcher la touche arrête la capture
 OVERLAY="${MURMURE_OVERLAY:-$MURMURE_HOME/overlay}"
 HISTORIQUE="$MURMURE_HOME/historique.jsonl"   # dernières dictées, lues par le menu
+RESTORE_CLIPBOARD="${MURMURE_RESTORE_CLIPBOARD:-0}"
+APP_BIN="${MURMURE_APP:-$HOME/Applications/Murmure.app/Contents/MacOS/Murmure}"
+CLIP_SAVE="$STATE_DIR/presse-papiers"   # contenu d'origine, le temps du collage
 mkdir -p "$STATE_DIR"
 
 # Calculs décimaux en locale C : en fr_FR, awk écrirait « 5,36 ».
@@ -209,6 +212,28 @@ start_recording() {
       >>"$LOG" 2>&1 &
 }
 
+# Met la dictée au presse-papiers. Avec MURMURE_RESTORE_CLIPBOARD=1, l'app
+# sauvegarde d'abord le contenu d'origine (tous types) dans CLIP_SAVE : au moment
+# du collage, pas au démarrage, car on peut copier pendant l'écoute.
+copy_text() {
+  rm -f "$CLIP_SAVE"
+  if [ "$RESTORE_CLIPBOARD" = 1 ]; then
+    [ -x "$APP_BIN" ] && printf '%s' "$1" | iconv -f UTF-8 -t UTF-8 \
+      | "$APP_BIN" --presse-papiers remplacer "$CLIP_SAVE" && return 0
+    log "presse-papiers : sauvegarde impossible ($APP_BIN)"
+  fi
+  printf '%s' "$1" | iconv -f UTF-8 -t UTF-8 | pbcopy
+}
+
+# Remet le contenu d'origine une fois le ⌘V lu par l'app cible. Jamais après un
+# collage raté : la dictée au presse-papiers est alors le seul moyen de la
+# récupérer.
+restore_clipboard() {
+  [ -f "$CLIP_SAVE" ] || return 0
+  nohup /bin/bash -c 'sleep 0.4 && exec "$1" --presse-papiers restaurer "$2"' _ \
+      "$APP_BIN" "$CLIP_SAVE" >>"$LOG" 2>&1 &
+}
+
 # Whisper hallucine des génériques de sous-titres quand l'audio est vide.
 is_hallucination() {
   # Testé sur une seule ligne : pas de motif « ligne vide » ici, il rejetterait
@@ -321,15 +346,19 @@ stop_and_transcribe() {
   # La pastille reste affichée, jauge pleine, jusqu'au collage effectif :
   # osascript met parfois plus d'une seconde à envoyer le ⌘V.
   printf 'pasting' >"$STATUS"
-  printf '%s' "$text" | iconv -f UTF-8 -t UTF-8 | pbcopy
+  copy_text "$text"
   log "transcrit: $text"
   local pid='' bundle=''
   read -r pid bundle 2>/dev/null <"$TARGET"
   if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
     log "app cible quittée ($bundle) : texte laissé dans le presse-papiers"
+    rm -f "$CLIP_SAVE"
     notify "Texte copié — Cmd+V pour coller"
+  elif paste_into "$pid" "$bundle"; then
+    restore_clipboard
   else
-    paste_into "$pid" "$bundle" || notify "Texte copié — Cmd+V pour coller"
+    rm -f "$CLIP_SAVE"
+    notify "Texte copié — Cmd+V pour coller"
   fi
   rm -f "$STATUS" "$TARGET"
   add_history "$text" "$bytes" "$bundle"   # après le collage : ne pas le retarder
