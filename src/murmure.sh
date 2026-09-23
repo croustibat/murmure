@@ -25,6 +25,10 @@ PROMPT_FILE="${MURMURE_PROMPT_FILE:-$MURMURE_HOME/vocabulaire.txt}"
 CORRECTIONS="${MURMURE_CORRECTIONS:-$MURMURE_HOME/corrections.txt}"
 CORRIGER="${MURMURE_CORRIGER:-$MURMURE_HOME/corriger.pl}"
 CADENCE="${MURMURE_CADENCE:-$MURMURE_HOME/cadence}"   # vitesse mesurée de la machine
+# Options ajoutées à whisper-cli (ex. « -bs 1 -bo 1 »). Vide par défaut : aucune
+# option mesurée par scripts/bench.sh n'accélère une dictée courte d'au moins 10 %
+# sans dégrader le texte, l'encodeur (fenêtre fixe de 30 s) dominant le temps.
+read -r -a WHISPER_ARGS <<<"${MURMURE_WHISPER_ARGS:-}"
 
 STATE_DIR="${MURMURE_STATE_DIR:-/tmp/murmure-$(id -u)}"
 PID_FILE="$STATE_DIR/ffmpeg.pid"
@@ -122,7 +126,8 @@ stop_and_transcribe() {
 
   local text
   text=$("$WHISPER_BIN" -m "$MODEL" -f "$WAV" -l "$LANGUAGE" \
-           "${prompt_args[@]}" --no-timestamps --no-prints 2>>"$LOG")
+           "${prompt_args[@]}" ${WHISPER_ARGS[@]+"${WHISPER_ARGS[@]}"} \
+           --no-timestamps --no-prints 2>>"$LOG")
   text=$(printf '%s' "$text" | tr '\n' ' ' | sed -e 's/  */ /g' -e 's/^ *//' -e 's/ *$//')
 
   # Dictionnaire de corrections : le prompt initial ne suffit pas sur l'anglais
