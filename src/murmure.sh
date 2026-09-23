@@ -84,7 +84,6 @@ STARTED="$STATE_DIR/started"   # horodatage du début de capture
 WHISPER_ERR="$STATE_DIR/whisper.err"   # sortie d'erreur de whisper-cli
 LOG_MAX="${MURMURE_LOG_MAX:-1048576}"   # au-delà, murmure.log devient murmure.log.1
 HOLD_MS="${MURMURE_HOLD_MS:-600}" # au-delà, relâcher la touche arrête la capture
-KARABINER_CLI="${MURMURE_KARABINER_CLI:-/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli}"
 OVERLAY="${MURMURE_OVERLAY:-$MURMURE_HOME/overlay}"
 mkdir -p "$STATE_DIR"
 
@@ -94,16 +93,9 @@ now()    { perl -MTime::HiRes=time -e 'printf "%.3f", time'; }
 log()    { printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$*" >>"$LOG"; }
 ding()   { afplay "/System/Library/Sounds/$1.aiff" >/dev/null 2>&1 & }
 notify() { osascript -e "display notification \"$1\" with title \"Murmure\"" >/dev/null 2>&1; }
-die()    { rm -f "$STATUS"; listening 0; log "ERREUR: $*"; ding Basso; notify "$1"; exit 1; }
+die()    { rm -f "$STATUS"; log "ERREUR: $*"; ding Basso; notify "$1"; exit 1; }
 
 for note in ${CONFIG_NOTES[@]+"${CONFIG_NOTES[@]}"}; do log "$note"; done
-
-# Variable Karabiner lue par la règle Échap : la touche n'est interceptée que
-# pendant l'écoute. Sans Karabiner, sans effet.
-listening() {
-  [ -x "$KARABINER_CLI" ] || return 0
-  "$KARABINER_CLI" --set-variables "{\"murmure_ecoute\":$1}" >>"$LOG" 2>&1
-}
 
 # Réclamation atomique de la capture : press, release et cancel tournent dans
 # des processus distincts, un seul doit l'arrêter.
@@ -118,7 +110,6 @@ stop_ffmpeg() {
     for _ in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || break; sleep 0.05; done
     kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null
   fi
-  listening 0
 }
 
 # App au premier plan, sous la forme « pid bundleid ».
@@ -206,7 +197,6 @@ start_recording() {
   # vérifie pid et horodatage pour ne jamais couper une capture suivante.
   nohup /bin/bash -c 'sleep "$1" && exec /bin/bash "$2" expire "$3" "$4"' _ \
       "$((MAX_SECONDS + 1))" "$0" "$pid" "$t0" >>"$LOG" 2>&1 &
-  listening 1
   log "capture démarrée (pid $pid)"
   remember_target   # après ffmpeg : ne pas retarder la capture
   ding Tink
@@ -359,8 +349,6 @@ case "${1:-toggle}" in
   cancel)
     if [ -f "$PID_FILE" ]; then
       cancel_recording
-    else
-      listening 0   # filet de sécurité : rien à annuler, on libère Échap
     fi ;;
   *) log "commande inconnue : $1"; exit 2 ;;
 esac

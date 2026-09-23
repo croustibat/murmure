@@ -20,7 +20,8 @@ il transforme votre voix en texte, partout, sans rien envoyer nulle part.
 - **Partout** — Mail, Slack, un terminal, un éditeur, un champ de recherche.
 - **Local** — Whisper `large-v3-turbo` sur votre machine, hors ligne.
 - **Rapide** — environ 2 secondes entre la fin de votre phrase et le texte collé.
-- **Discret** — une pastille flottante pendant l'écoute, rien d'autre.
+- **Discret** — une icône dans la barre des menus, une pastille flottante pendant
+  l'écoute, rien d'autre.
 - **Corrigé** — un dictionnaire rattrape le vocabulaire technique que Whisper
   francise (« commis » → « commit », « worktrade » → « worktree »).
 
@@ -38,7 +39,8 @@ cd murmure
 ```
 
 L'installeur pose `ffmpeg` et `whisper-cpp`, télécharge le modèle (~550 Mo, une fois),
-compile la pastille, crée `~/Applications/Murmure.app` et dépose la règle de raccourci.
+compile la pastille et l'app `~/Applications/Murmure.app`, puis la lance : son icône
+apparaît dans la barre des menus.
 
 Pour mettre à jour, `git pull` puis `./install.sh` à nouveau. L'installeur ne remplace
 que ce qui a changé et l'annonce en fin d'installation : tant que `Murmure.app` est
@@ -55,22 +57,49 @@ Pour que le texte se colle tout seul, ajoutez ensuite `Murmure.app` dans
 **Réglages > Confidentialité et sécurité > Accessibilité**. Sans cela le texte
 arrive dans le presse-papiers et vous faites ⌘V vous-même.
 
+En venant d'une version où `Murmure.app` n'était qu'un lanceur (déclenché par
+Karabiner), macOS redemande ces deux autorisations **une fois** : l'app est nouvelle
+à ses yeux.
+
 ### Le raccourci
 
-Avec [Karabiner-Elements](https://karabiner-elements.pqrs.org), la règle est déposée
-automatiquement : activez-la dans **Complex Modifications > Add rule**. Elle utilise
-⌘⇧E — et non ⌘E, qui priverait le Finder de « Éjecter ». Après une mise à jour,
-supprimez l'ancienne règle Murmure puis ajoutez la nouvelle.
+`Murmure.app` reste ouverte dans la barre des menus et gère elle-même le raccourci
+global, **⌘⇧E** par défaut — et non ⌘E, qui priverait le Finder de « Éjecter ».
+Aucun outil tiers n'est nécessaire, ni l'autorisation « Surveillance de l'entrée ».
 
-Sans Karabiner, associez ce raccourci avec l'outil de votre choix :
+Pour en changer, ajoutez une ligne `MURMURE_SHORTCUT` dans
+`~/.local/share/murmure/config`, puis quittez et rouvrez Murmure :
 
 ```
-/usr/bin/open -n -a ~/Applications/Murmure.app
+MURMURE_SHORTCUT=ctrl+alt+d
 ```
 
-Sans argument, Murmure bascule (un appui démarre, le suivant arrête). Pour le
-maintien et l'annulation, l'outil doit appeler `--args press` à l'appui,
-`--args release` au relâchement et `--args cancel` pour annuler.
+Modificateurs : `cmd`, `shift`, `alt` (ou `option`), `ctrl` ; touche : une lettre ou
+un chiffre (selon la disposition du clavier), `space`, `f1` à `f20`… Le menu affiche
+le raccourci actif, et le journal signale une combinaison illisible ou refusée.
+
+**Karabiner n'est plus nécessaire.** Si vous l'utilisiez pour Murmure, supprimez la
+règle dans **Complex Modifications** (Remove) : sinon un appui démarrerait puis
+arrêterait aussitôt la dictée. `./install.sh` signale une telle règle encore active.
+
+Raycast, Karabiner ou tout autre outil peuvent toujours piloter Murmure :
+
+```
+/usr/bin/open -n -a ~/Applications/Murmure.app --args toggle
+```
+
+L'option `-n` est indispensable : elle lance une instance éphémère qui exécute la
+commande puis s'arrête, sans toucher à l'instance de la barre des menus. Sans elle,
+macOS se contente de réveiller l'app déjà ouverte et la commande est perdue.
+Commandes : `toggle` (bascule), `press` à l'appui et `release` au relâchement
+(maintenir pour parler), `cancel` pour annuler.
+
+### Le menu
+
+L'icône de la barre des menus change pendant l'écoute et la transcription. Son menu
+donne l'état et le raccourci, démarre ou arrête une dictée, ouvre le journal, affiche
+la version, et propose **Ouvrir au démarrage** pour lancer Murmure à l'ouverture de
+session. Murmure ne garde aucun modèle en mémoire entre deux dictées.
 
 ## Utilisation
 
@@ -84,7 +113,7 @@ Deux modes, sans réglage :
 
 Vous pouvez aussi cliquer le carré de la pastille pour arrêter et transcrire.
 
-**Annuler** une dictée ratée : **Échap** pendant l'écoute (règle Karabiner), ou le ✕ de la pastille.
+**Annuler** une dictée ratée : **Échap** pendant l'écoute, ou le ✕ de la pastille.
 L'enregistrement est jeté, rien n'est collé. Échap n'est intercepté que pendant
 l'écoute : le reste du temps, il garde son rôle normal dans toutes les applications.
 
@@ -178,7 +207,7 @@ scripts/bench.sh -c 'défaut|' -c 'glouton|-bs 1 -bo 1' dictee1.wav
 ## Comment ça marche
 
 ```
-⌘⇧E → Murmure.app → murmure.sh
+⌘⇧E → Murmure.app (barre des menus) → murmure.sh
                       ├─ ffmpeg (avfoundation) ──→ WAV 16 kHz mono
                       ├─ overlay (AppKit) ───────→ pastille flottante
                       ├─ whisper-cli ────────────→ texte
@@ -207,7 +236,8 @@ d'environ 1 Mo, le journal est renommé `murmure.log.1` et repart de zéro.
 | Texte copié mais pas collé | `Murmure.app` absent de la liste Accessibilité |
 | Accents cassés (`Soci√©t√©`) | locale non UTF-8 dans l'environnement du raccourci |
 | Première dictée très lente | chargement du modèle et des shaders Metal ; les suivantes sont rapides |
-| ⌘⇧E lance une autre app, ou une ancienne version | une autre règle ⌘⇧E active dans Karabiner : `./install.sh` la signale, retirez-la dans Complex Modifications |
+| ⌘⇧E démarre puis arrête aussitôt, ou lance autre chose | une règle Karabiner encore active : `./install.sh` la signale, retirez-la dans Complex Modifications |
+| ⌘⇧E ne fait rien | Murmure n'est pas ouverte (icône absente) ou le raccourci est pris : le menu et le journal l'indiquent |
 | Autorisations à redonner après une mise à jour | `Murmure.app` a changé (l'installeur l'indique) : macOS voit une nouvelle signature |
 | Erreur de modèle au lancement de Whisper | fichier abîmé : `./install.sh --verify` |
 
@@ -216,6 +246,9 @@ d'environ 1 Mo, le journal est renommé `murmure.log.1` et repart de zéro.
 ```bash
 ./uninstall.sh
 ```
+
+Le script quitte Murmure, retire le lancement au démarrage, l'app, le modèle et les
+fichiers de `~/.local/share/murmure`.
 
 ## Licence
 
