@@ -31,6 +31,7 @@ PID_FILE="$STATE_DIR/ffmpeg.pid"
 WAV="$STATE_DIR/recording.wav"
 LOG="$STATE_DIR/murmure.log"
 STATUS="$STATE_DIR/status"
+BUSY="$STATE_DIR/transcribing.pid"
 OVERLAY="${MURMURE_OVERLAY:-$MURMURE_HOME/overlay}"
 mkdir -p "$STATE_DIR"
 
@@ -73,6 +74,10 @@ has_speech() {
 }
 
 stop_and_transcribe() {
+  # Verrou posé avant de retirer PID_FILE : un nouvel appui pendant la
+  # transcription ne doit pas relancer une capture par-dessus.
+  echo $$ >"$BUSY"
+  trap 'rm -f "$BUSY"' EXIT
   local pid; pid=$(cat "$PID_FILE" 2>/dev/null)
   rm -f "$PID_FILE"
   if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
@@ -148,4 +153,10 @@ stop_and_transcribe() {
   rm -f "$STATUS"
 }
 
-if [ -f "$PID_FILE" ]; then stop_and_transcribe; else start_recording; fi
+if [ -f "$PID_FILE" ]; then
+  stop_and_transcribe
+elif kill -0 "$(cat "$BUSY" 2>/dev/null)" 2>/dev/null; then
+  log "appui ignoré : transcription en cours"
+else
+  start_recording
+fi
