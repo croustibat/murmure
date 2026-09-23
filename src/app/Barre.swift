@@ -16,6 +16,7 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let demarrage = NSMenuItem(title: "Ouvrir au démarrage", action: #selector(changerDemarrage), keyEquivalent: "")
     private var raccourcis: Raccourcis!
     private var etat: Etat?
+    private var enfonce = false   // touche du raccourci actuellement enfoncée
     private var surveillance: DispatchSourceFileSystemObject?
     private var releve: Timer?
 
@@ -73,6 +74,12 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func touche(_ id: UInt32, _ appuye: Bool) {
+        // Un seul press par appui physique, même si le système répétait
+        // l'événement pendant un maintien (chaque press bascule l'écoute).
+        if id == Barre.idDictee {
+            guard appuye != enfonce else { return }
+            enfonce = appuye
+        }
         switch (id, appuye) {
         case (Barre.idDictee, true): lancer("press") { self.lireEtat() }
         case (Barre.idDictee, false): lancer("release") { self.lireEtat() }
