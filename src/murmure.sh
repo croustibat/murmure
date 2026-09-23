@@ -24,6 +24,7 @@ SILENCE_DB="${MURMURE_SILENCE_DB:--70}"   # en dessous : rien n'a été capté
 PROMPT_FILE="${MURMURE_PROMPT_FILE:-$MURMURE_HOME/vocabulaire.txt}"
 CORRECTIONS="${MURMURE_CORRECTIONS:-$MURMURE_HOME/corrections.txt}"
 CORRIGER="${MURMURE_CORRIGER:-$MURMURE_HOME/corriger.pl}"
+CADENCE="${MURMURE_CADENCE:-$MURMURE_HOME/cadence}"   # vitesse mesurée de la machine
 
 STATE_DIR="${MURMURE_STATE_DIR:-/tmp/murmure-$(id -u)}"
 PID_FILE="$STATE_DIR/ffmpeg.pid"
@@ -33,6 +34,9 @@ STATUS="$STATE_DIR/status"
 OVERLAY="${MURMURE_OVERLAY:-$MURMURE_HOME/overlay}"
 mkdir -p "$STATE_DIR"
 
+# Calculs décimaux en locale C : en fr_FR, awk écrirait « 5,36 ».
+calc()   { LC_ALL=C awk "$@"; }
+now()    { perl -MTime::HiRes=time -e 'printf "%.3f", time'; }
 log()    { printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$*" >>"$LOG"; }
 ding()   { afplay "/System/Library/Sounds/$1.aiff" >/dev/null 2>&1 & }
 notify() { osascript -e "display notification \"$1\" with title \"Murmure\"" >/dev/null 2>&1; }
@@ -78,10 +82,21 @@ stop_and_transcribe() {
   fi
   ding Pop
   printf 'transcribing' >"$STATUS"
+  local t0; t0=$(now)
 
   [ -s "$WAV" ] || die "Aucun fichier audio produit"
   local bytes; bytes=$(stat -f%z "$WAV")
   [ "$bytes" -gt "$MIN_BYTES" ] || die "Trop court — garde la touche plus longtemps"
+
+  # Durée estimée de la transcription, pour la jauge de la pastille. Whisper ne
+  # donne qu'une progression par fenêtre de 30 s : inexploitable sur une dictée.
+  # Base : ~1,8 s de démarrage + 0,1 s par seconde d'audio, pondérée par un
+  # facteur appris sur cette machine au fil des transcriptions.
+  local base cadence estimate
+  base=$(calc -v b="$bytes" 'BEGIN { printf "%.2f", 1.8 + 0.1 * b / 32000 }')
+  cadence=$(cat "$CADENCE" 2>/dev/null); cadence=${cadence:-1}
+  estimate=$(calc -v b="$base" -v c="$cadence" 'BEGIN { printf "%.2f", b * c }')
+  printf 'transcribing %s' "$estimate" >"$STATUS"
 
   # Garde anti-silence : sans autorisation Micro, macOS livre un flux muet
   # au lieu d'une erreur, et Whisper invente alors du texte.
@@ -117,11 +132,20 @@ stop_and_transcribe() {
     die "Rien d'audible détecté"
   fi
 
-  rm -f "$STATUS"
+  local elapsed; elapsed=$(calc -v a="$t0" -v b="$(now)" 'BEGIN { printf "%.2f", b - a }')
+  calc -v c="$cadence" -v e="$elapsed" -v b="$base" 'BEGIN {
+    r = e / b; if (r < 0.3) r = 0.3; if (r > 5) r = 5
+    printf "%.3f\n", 0.7 * c + 0.3 * r }' >"$CADENCE" 2>/dev/null
+  log "transcription: ${elapsed}s (estimé ${estimate}s)"
+
+  # La pastille reste affichée, jauge pleine, jusqu'au collage effectif :
+  # osascript met parfois plus d'une seconde à envoyer le ⌘V.
+  printf 'pasting' >"$STATUS"
   printf '%s' "$text" | iconv -f UTF-8 -t UTF-8 | pbcopy
   log "transcrit: $text"
   osascript -e 'tell application "System Events" to keystroke "v" using command down' \
     >>"$LOG" 2>&1 || notify "Texte copié — Cmd+V pour coller"
+  rm -f "$STATUS"
 }
 
 if [ -f "$PID_FILE" ]; then stop_and_transcribe; else start_recording; fi

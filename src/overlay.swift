@@ -2,7 +2,9 @@ import AppKit
 
 // Murmure — pastille flottante affichée pendant la dictée.
 // Onde animée + libellé + bouton stop. L'état est lu dans un fichier :
-// « recording », « transcribing », et sa disparition ferme la fenêtre.
+// « recording », « transcribing <durée estimée> », « pasting », et sa
+// disparition ferme la fenêtre. Pendant la transcription, les points de l'onde
+// servent de jauge et s'allument un à un.
 
 let statusPath = CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
@@ -15,6 +17,7 @@ final class PillView: NSView {
     var phase: CGFloat = 0
     var label: String = "Vous parlez"
     var listening: Bool = true
+    var progress: CGFloat = 0   // 0…1, jauge affichée hors écoute
     private var stopRect: NSRect = .zero
 
     private let font = NSFont.systemFont(ofSize: 13, weight: .medium)
@@ -46,13 +49,21 @@ final class PillView: NSView {
         let gap: CGFloat = 3.5
         let waveX: CGFloat = 18
         let midY = r.midY
+        let filled = progress * CGFloat(bars)
         for i in 0..<bars {
             let t = phase + CGFloat(i) * 0.55
             let amp: CGFloat = listening ? (sin(t) * 0.5 + 0.5) : 0.18
             let h = 3 + amp * 13
             let x = waveX + CGFloat(i) * (barW + gap)
             let br = NSRect(x: x, y: midY - h / 2, width: barW, height: h)
-            NSColor(calibratedWhite: 1.0, alpha: listening ? 0.92 : 0.45).setFill()
+            var alpha: CGFloat = 0.92
+            if !listening {
+                // Point allumé, en cours (partiel + léger pouls) ou éteint.
+                let lit = min(max(filled - CGFloat(i), 0), 1)
+                let pulse = (lit < 1 && filled > CGFloat(i) - 1) ? (sin(phase * 1.5) * 0.5 + 0.5) * 0.12 : 0
+                alpha = 0.25 + lit * 0.72 + pulse
+            }
+            NSColor(calibratedWhite: 1.0, alpha: alpha).setFill()
             NSBezierPath(roundedRect: br, xRadius: barW / 2, yRadius: barW / 2).fill()
         }
 
@@ -89,6 +100,8 @@ final class PillView: NSView {
 final class Controller: NSObject {
     let window: NSPanel
     let view: PillView
+    private var transcribeStart: Date?
+    private var estimate: TimeInterval = 3
 
     override init() {
         view = PillView(frame: NSRect(x: 0, y: 0, width: 220, height: 44))
@@ -110,11 +123,20 @@ final class Controller: NSObject {
         Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.view.phase += 0.22
+            self.updateProgress()
             self.view.needsDisplay = true
         }
         Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
             self?.syncStatus()
         }
+    }
+
+    // Avance linéaire jusqu'à 90 % de l'estimation, puis approche asymptotique :
+    // la jauge ne se remplit jamais avant que le texte soit prêt.
+    func updateProgress() {
+        guard let start = transcribeStart, view.progress < 1 else { return }
+        let r = CGFloat(Date().timeIntervalSince(start) / estimate)
+        view.progress = r < 0.9 ? r : 0.9 + 0.09 * (1 - exp(-(r - 0.9) / 0.4))
     }
 
     func reposition() {
@@ -130,13 +152,21 @@ final class Controller: NSObject {
         guard let raw = try? String(contentsOfFile: statusPath, encoding: .utf8) else {
             NSApp.terminate(nil); return
         }
-        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = raw.split(whereSeparator: \.isWhitespace)
+        let s = parts.first.map(String.init) ?? ""
         if s == "recording" {
             view.listening = true
             view.label = "Vous parlez"
+            transcribeStart = nil
         } else if s == "transcribing" {
             view.listening = false
             view.label = "Transcription…"
+            if transcribeStart == nil { transcribeStart = Date() }
+            if parts.count > 1, let e = Double(parts[1].replacingOccurrences(of: ",", with: ".")), e > 0 { estimate = e }
+        } else if s == "pasting" {
+            view.listening = false
+            view.label = "Transcription…"
+            view.progress = 1
         } else {
             NSApp.terminate(nil); return
         }
