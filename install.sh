@@ -60,7 +60,7 @@ command -v whisper-cli >/dev/null || { step "Installation de whisper.cpp"; brew 
 command -v ffmpeg >/dev/null     || fail "ffmpeg introuvable après installation."
 command -v whisper-cli >/dev/null || fail "whisper-cli introuvable après installation."
 ok "ffmpeg et whisper-cli présents"
-command -v swiftc >/dev/null || fail "swiftc requis pour la pastille : xcode-select --install"
+command -v swiftc >/dev/null || fail "swiftc requis pour la pastille et l'app : xcode-select --install"
 ok "swiftc présent"
 
 step "Installation des fichiers dans $MURMURE_HOME"
@@ -159,41 +159,49 @@ fi
 # Le bundle .app est indispensable : un script nu n'a pas d'identité TCC, macOS ne
 # propose jamais l'autorisation micro et livre un flux muet à la place.
 # Les autorisations Micro et Accessibilité suivent la signature : on ne recrée ni
-# ne re-signe le bundle que si son contenu change. Son exécutable n'est qu'un
-# lanceur de murmure.sh, les mises à jour du script ne le touchent donc pas.
+# ne re-signe le bundle que si son contenu change. swiftc ne produisant pas deux
+# fois le même binaire, Info.plist porte l'empreinte des sources de l'app et du
+# compilateur : l'app n'est recompilée que si cette empreinte change. Les mises à
+# jour de murmure.sh ne la touchent pas.
 step "Création de Murmure.app"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
-cat > "$STAGE/Murmure" <<EXE
-#!/bin/bash
-exec "$MURMURE_HOME/murmure.sh" "\$@"
-EXE
+VERSION="$(tr -d '[:space:]' < "$SRC/VERSION")"
+APP_SUM="$( { cat "$SRC"/src/app/*.swift | shasum -a 256; swiftc --version 2>&1 | head -1; } | shasum -a 256 | cut -d' ' -f1)"
+cp "$SRC/app/Info.plist" "$STAGE/Info.plist"
+plutil -replace CFBundleShortVersionString -string "$VERSION" "$STAGE/Info.plist"
+plutil -replace CFBundleVersion -string "$VERSION" "$STAGE/Info.plist"
+plutil -replace MurmureHome -string "$MURMURE_HOME" "$STAGE/Info.plist"
+plutil -replace MurmureSourceSum -string "$APP_SUM" "$STAGE/Info.plist"
 if [ -d "$APP" ] \
-   && cmp -s "$SRC/app/Info.plist" "$APP/Contents/Info.plist" \
-   && cmp -s "$STAGE/Murmure" "$APP/Contents/MacOS/Murmure" \
+   && cmp -s "$STAGE/Info.plist" "$APP/Contents/Info.plist" \
+   && [ -x "$APP/Contents/MacOS/Murmure" ] \
    && codesign --verify "$APP" >/dev/null 2>&1; then
   ok "$APP inchangée — signature et autorisations conservées"
   note "Murmure.app : inchangée"
 else
+  swiftc -O -parse-as-library -o "$STAGE/Murmure" "$SRC"/src/app/*.swift \
+    || fail "compilation de Murmure.app impossible"
   if [ -d "$APP" ]; then
     note "Murmure.app : recréée — autorisations Micro et Accessibilité à redonner"
   else
     note "Murmure.app : créée"
   fi
+  pkill -f "$APP/Contents/MacOS/Murmure" 2>/dev/null || true   # ancienne version
   mkdir -p "$APP_DIR"
   rm -rf "$APP"
   mkdir -p "$APP/Contents/MacOS"
-  cp "$SRC/app/Info.plist" "$APP/Contents/Info.plist"
+  cp "$STAGE/Info.plist" "$APP/Contents/Info.plist"
   cp "$STAGE/Murmure" "$APP/Contents/MacOS/Murmure"
   chmod +x "$APP/Contents/MacOS/Murmure"
   codesign --force --sign - "$APP" >/dev/null 2>&1 || warn "signature ad-hoc impossible"
-  ok "$APP"
+  ok "$APP ($VERSION)"
 fi
 
-# Règles actives de karabiner.json sur ⌘⇧E, une par ligne :
-# « ok|profil|règle|commande » si elle lance $APP, « conflit|… » sinon.
+# Règles actives de karabiner.json qui lancent Murmure (« murmure|profil|règle|
+# commande ») ou qui prennent ⌘⇧E pour autre chose (« conflit|… »), une par ligne.
 # Lecture seule : karabiner.json n'est jamais modifié.
-karabiner_rules() {  # karabiner.json app
+karabiner_rules() {  # karabiner.json
   osascript -l JavaScript -e '
     function run(argv) {
       const raw = $.NSString.stringWithContentsOfFileEncodingError(argv[0], $.NSUTF8StringEncoding, null);
@@ -205,88 +213,70 @@ karabiner_rules() {  # karabiner.json app
       for (const p of cfg.profiles || []) {
         for (const r of (p.complex_modifications || {}).rules || []) {
           if (r.enabled === false) continue;
+          // Une ligne par règle (⌘⇧E et Échap de la règle Murmure : une seule)
+          let kind = "", cmd = "";
           for (const m of r.manipulators || []) {
             const f = m.from || {};
             const mods = (f.modifiers || {}).mandatory || [];
-            if (f.key_code !== "e" || !has(mods, "command") || !has(mods, "shift")) continue;
             const cmds = (m.to || []).map(t => t.shell_command).filter(Boolean);
-            const mine = cmds.some(c => c.includes(argv[1]));
-            const cmd = cmds.join(" ; ") || JSON.stringify(m.to || []);
-            const kind = !mine ? "conflit" : cmds.some(c => c.includes("--args press")) ? "ok" : "ancienne";
-            out.push([kind, p.name || "?", r.description || "(sans description)", cmd].join("|"));
+            if (cmds.some(c => c.includes("Murmure.app"))) {
+              kind = "murmure"; cmd = cmds.join(" ; "); break;
+            }
+            if (f.key_code === "e" && has(mods, "command") && has(mods, "shift")) {
+              kind = "conflit"; cmd = cmds.join(" ; ") || JSON.stringify(m.to || []);
+            }
           }
+          if (kind) out.push([kind, p.name || "?", r.description || "(sans description)", cmd].join("|"));
         }
       }
       return out.join("\n");
-    }' "$1" "$2" 2>/dev/null || true
+    }' "$1" 2>/dev/null || true
 }
 
+# L'app gère elle-même le raccourci : Karabiner n'est plus nécessaire. Une règle
+# Murmure encore active ferait double emploi — un appui démarrerait puis
+# arrêterait aussitôt la dictée.
 step "Raccourci clavier"
-KB_DIR="$KARABINER_DIR/assets/complex_modifications"
-if [ -d "$KARABINER_DIR" ]; then
-  mkdir -p "$KB_DIR"
-  cat > "$KB_DIR/murmure.json" <<KB
-{
-    "title": "Murmure",
-    "rules": [
-        {
-            "description": "Murmure : ⌘⇧E dictée (appui bref : bascule, maintenu : parler), Échap annule",
-            "manipulators": [
-                {
-                    "type": "basic",
-                    "from": { "key_code": "e", "modifiers": { "mandatory": ["command", "shift"] } },
-                    "to": [{ "shell_command": "/usr/bin/open -n -a '$APP' --args press" }],
-                    "to_after_key_up": [{ "shell_command": "/usr/bin/open -n -a '$APP' --args release" }]
-                },
-                {
-                    "type": "basic",
-                    "from": { "key_code": "escape" },
-                    "conditions": [{ "type": "variable_if", "name": "murmure_ecoute", "value": 1 }],
-                    "to": [{ "shell_command": "/usr/bin/open -n -a '$APP' --args cancel" }]
-                }
-            ]
-        }
-    ]
-}
-KB
-  KB_ACTIVE=0; KB_CONFLICT=0; KB_OLD=0
-  if [ -f "$KARABINER_DIR/karabiner.json" ]; then
-    while IFS='|' read -r kind profile desc cmd; do
-      case "$kind" in
-        ok) KB_ACTIVE=1 ;;
-        ancienne) KB_OLD=1 ;;
-        conflit)
-          KB_CONFLICT=1
-          warn "conflit : une règle ⌘⇧E active ne lance pas $APP"
-          echo "      profil   : $profile"
-          echo "      règle    : $desc"
-          echo "      commande : $cmd"
-          ;;
-      esac
-    done < <(karabiner_rules "$KARABINER_DIR/karabiner.json" "$APP")
+SHORTCUT="$(sed -n 's/^[[:space:]]*MURMURE_SHORTCUT[[:space:]]*=[[:space:]]*//p' "$MURMURE_HOME/config" 2>/dev/null | tail -1 | tr -d "\"'")"
+SHORTCUT="${SHORTCUT:-cmd+shift+e}"
+ok "géré par Murmure.app : $SHORTCUT"
+KB_FILE="$KARABINER_DIR/assets/complex_modifications/murmure.json"
+if [ -f "$KB_FILE" ]; then
+  rm -f "$KB_FILE"
+  ok "ancienne règle Karabiner retirée de la liste « Add rule »"
+fi
+if [ -f "$KARABINER_DIR/karabiner.json" ]; then
+  KB_MINE=0; KB_CONFLICT=0
+  while IFS='|' read -r kind profile desc cmd; do
+    [ -n "$kind" ] || continue
+    [ "$kind" = murmure ] && KB_MINE=1 || KB_CONFLICT=1
+    warn "règle Karabiner active à supprimer :"
+    echo "      profil   : $profile"
+    echo "      règle    : $desc"
+    echo "      commande : $cmd"
+  done < <(karabiner_rules "$KARABINER_DIR/karabiner.json")
+  if [ "$KB_MINE" = 1 ]; then
+    echo "      Cette règle lance Murmure en plus du raccourci de l'app : un appui"
+    echo "      démarrerait puis arrêterait aussitôt la dictée."
   fi
   if [ "$KB_CONFLICT" = 1 ]; then
-    echo "      Cette règle l'emporte et ⌘⇧E lance autre chose que Murmure."
-    echo "      Corrigez dans Karabiner > Complex Modifications : Remove sur l'ancienne"
-    echo "      règle, puis Add rule > Murmure. $KARABINER_DIR/karabiner.json n'est"
-    echo "      pas modifié automatiquement."
-    note "raccourci : CONFLIT avec une autre règle ⌘⇧E (voir plus haut)"
-  elif [ "$KB_OLD" = 1 ] && [ "$KB_ACTIVE" = 0 ]; then
-    warn "la règle ⌘⇧E active est une ancienne version (bascule seule)"
-    echo "      Pour maintenir-pour-parler et Échap : Remove sur l'ancienne règle,"
-    echo "      puis Add rule > Murmure dans Karabiner > Complex Modifications."
-    note "raccourci : ancienne règle active (à remplacer)"
-  elif [ "$KB_ACTIVE" = 1 ]; then
-    ok "règle déposée — déjà active dans Karabiner"
-    note "raccourci : actif"
-  else
-    ok "règle déposée — active-la dans Karabiner > Complex Modifications > Add rule"
-    note "raccourci : règle à activer dans Karabiner"
+    echo "      Une règle ⌘⇧E qui ne lance pas Murmure intercepte le raccourci."
   fi
+  if [ "$KB_MINE" = 1 ] || [ "$KB_CONFLICT" = 1 ]; then
+    echo "      Supprimez-la dans Karabiner > Complex Modifications (Remove)."
+    echo "      $KARABINER_DIR/karabiner.json n'est pas modifié automatiquement."
+    note "raccourci : règle Karabiner à supprimer (voir plus haut)"
+  fi
+fi
+
+# Relance : l'app relit le raccourci et prend la nouvelle version.
+step "Lancement de Murmure"
+pkill -f "$APP/Contents/MacOS/Murmure" 2>/dev/null || true
+for _ in $(seq 1 20); do pgrep -f "$APP/Contents/MacOS/Murmure" >/dev/null || break; sleep 0.1; done
+if open ${MURMURE_STATE_DIR:+--env "MURMURE_STATE_DIR=$MURMURE_STATE_DIR"} "$APP"; then
+  ok "Murmure est dans la barre des menus"
 else
-  warn "Karabiner-Elements non détecté."
-  echo "    Associe ce raccourci à la commande :"
-  echo "      /usr/bin/open -n -a '$APP'"
+  warn "lancement impossible — ouvrez $APP"
 fi
 
 cat <<FIN
@@ -304,7 +294,9 @@ Il reste deux autorisations à accorder, au ${bold}premier usage${off} :
 
 Sans la seconde, le texte va dans le presse-papiers et vous faites ⌘V.
 
-Essai : ⌘⇧E, parlez, ⌘⇧E — ou gardez ⌘⇧E enfoncé le temps de parler.
-Échap pendant l'écoute annule.
+Essai : $SHORTCUT, parlez, puis à nouveau — ou gardez la combinaison
+enfoncée le temps de parler. Échap pendant l'écoute annule.
+L'icône de Murmure dans la barre des menus donne l'état, le journal et le
+lancement au démarrage.
 Journal : /tmp/murmure-$(id -u)/murmure.log
 FIN
