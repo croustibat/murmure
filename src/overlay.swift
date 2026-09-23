@@ -3,8 +3,9 @@ import AppKit
 // Murmure — pastille flottante affichée pendant la dictée.
 // Onde animée + libellé + bouton stop. L'état est lu dans un fichier :
 // « recording », « transcribing <durée estimée> », « pasting », et sa
-// disparition ferme la fenêtre. Pendant la transcription, les points de l'onde
-// servent de jauge et s'allument un à un.
+// disparition ferme la fenêtre. Pendant l'écoute, l'onde suit le niveau RMS
+// qu'écrit ffmpeg dans « levels », à côté du fichier d'état. Pendant la
+// transcription, les points de l'onde servent de jauge et s'allument un à un.
 
 let statusPath = CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
@@ -12,12 +13,14 @@ let statusPath = CommandLine.arguments.count > 1
 let toggleScript = CommandLine.arguments.count > 2
     ? CommandLine.arguments[2]
     : NSString(string: "~/.local/share/murmure/murmure.sh").expandingTildeInPath
+let levelsPath = (statusPath as NSString).deletingLastPathComponent + "/levels"
 
 final class PillView: NSView {
     var phase: CGFloat = 0
     var label: String = "Vous parlez"
     var listening: Bool = true
     var progress: CGFloat = 0   // 0…1, jauge affichée hors écoute
+    var level: CGFloat = 0      // 0…1, niveau de la voix pendant l'écoute
     private var stopRect: NSRect = .zero
 
     private let font = NSFont.systemFont(ofSize: 13, weight: .medium)
@@ -43,7 +46,8 @@ final class PillView: NSView {
         path.lineWidth = 1
         path.stroke()
 
-        // Onde animée à gauche
+        // Onde à gauche : amplitude portée par le niveau réel, bombée au centre
+        // et légèrement ondulée pour rester vivante ; plate dans le silence.
         let bars = 8
         let barW: CGFloat = 3
         let gap: CGFloat = 3.5
@@ -52,7 +56,8 @@ final class PillView: NSView {
         let filled = progress * CGFloat(bars)
         for i in 0..<bars {
             let t = phase + CGFloat(i) * 0.55
-            let amp: CGFloat = listening ? (sin(t) * 0.5 + 0.5) : 0.18
+            let bulge = 0.55 + 0.45 * sin(.pi * (CGFloat(i) + 0.5) / CGFloat(bars))
+            let amp: CGFloat = listening ? level * bulge * (0.7 + 0.3 * sin(t)) : 0.18
             let h = 3 + amp * 13
             let x = waveX + CGFloat(i) * (barW + gap)
             let br = NSRect(x: x, y: midY - h / 2, width: barW, height: h)
@@ -123,12 +128,32 @@ final class Controller: NSObject {
         Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.view.phase += 0.22
+            self.updateLevel()
             self.updateProgress()
             self.view.needsDisplay = true
         }
         Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
             self?.syncStatus()
         }
+    }
+
+    // Lit le dernier « RMS_level=<dB> » en fin de fichier : -55 dB (bruit de
+    // fond) donne une onde plate, -20 dB (voix proche) une onde pleine.
+    // Montée rapide, retombée plus douce.
+    func updateLevel() {
+        guard view.listening else { view.level = 0; return }
+        var target: CGFloat = 0
+        if let fh = FileHandle(forReadingAtPath: levelsPath) {
+            let end = fh.seekToEndOfFile()
+            fh.seek(toFileOffset: end > 200 ? end - 200 : 0)
+            let tail = String(decoding: fh.readDataToEndOfFile(), as: UTF8.self)
+            fh.closeFile()
+            if let line = tail.components(separatedBy: "RMS_level=").last.flatMap({ $0.split(separator: "\n").first }),
+               let db = Double(line), db.isFinite {
+                target = min(max(CGFloat(db + 55) / 35, 0), 1)
+            }
+        }
+        view.level += (target - view.level) * (target > view.level ? 0.6 : 0.15)
     }
 
     // Avance linéaire jusqu'à 90 % de l'estimation, puis approche asymptotique :
