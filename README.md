@@ -118,6 +118,21 @@ Quelques variables d'environnement permettent d'ajuster le reste :
 | `MURMURE_MAX` | `300` | durée maximale d'un enregistrement, en secondes |
 | `MURMURE_HOLD_MS` | `600` | au-delà, relâcher ⌘⇧E arrête l'écoute (appui maintenu) |
 | `MURMURE_SILENCE_DB` | `-70` | seuil en dessous duquel l'audio est jugé muet |
+| `MURMURE_WHISPER_ARGS` | _(vide)_ | options ajoutées à `whisper-cli`, par exemple `-bs 1 -bo 1` |
+
+### Vitesse de transcription
+
+Les options par défaut de `whisper-cli` sont conservées : sur une dictée courte,
+l'encodeur traite toujours une fenêtre de 30 s et représente l'essentiel du temps.
+Réduire cette fenêtre (`-ac`) fait répéter le texte à Whisper, et les autres options
+(décodage glouton, `--no-fallback`, threads, VAD) gagnent moins de 10 % ou abîment
+la transcription. Pour mesurer sur votre machine, avec vos propres enregistrements
+(un `.txt` de référence à côté de chaque `.wav` active le calcul du taux d'erreur) :
+
+```bash
+scripts/bench.sh -n 5 dictee1.wav dictee2.wav
+scripts/bench.sh -c 'défaut|' -c 'glouton|-bs 1 -bo 1' dictee1.wav
+```
 
 ## Comment ça marche
 
