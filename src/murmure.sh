@@ -2,7 +2,7 @@
 # Murmure — dictée vocale locale pour macOS.
 # Bascule : un appui démarre la capture, un second transcrit et colle.
 # Sous-commandes : toggle (défaut), press / release (maintenir pour parler),
-# cancel (annuler l'écoute sans rien transcrire).
+# cancel (annuler l'écoute sans rien transcrire), expire (interne : durée max atteinte).
 # Lancé depuis Murmure.app pour disposer d'une identité TCC (autorisation Micro).
 set -uo pipefail
 
@@ -81,6 +81,8 @@ STATUS="$STATE_DIR/status"
 BUSY="$STATE_DIR/transcribing.pid"
 TARGET="$STATE_DIR/target"   # app active au démarrage : « pid bundleid »
 STARTED="$STATE_DIR/started"   # horodatage du début de capture
+WHISPER_ERR="$STATE_DIR/whisper.err"   # sortie d'erreur de whisper-cli
+LOG_MAX="${MURMURE_LOG_MAX:-1048576}"   # au-delà, murmure.log devient murmure.log.1
 HOLD_MS="${MURMURE_HOLD_MS:-600}" # au-delà, relâcher la touche arrête la capture
 KARABINER_CLI="${MURMURE_KARABINER_CLI:-/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli}"
 OVERLAY="${MURMURE_OVERLAY:-$MURMURE_HOME/overlay}"
@@ -186,6 +188,8 @@ start_recording() {
   [ -f "$MODEL" ]      || die "Modèle Whisper introuvable"
   resolve_device
   rm -f "$WAV" "$LEVELS"
+  local size; size=$(stat -f%z "$LOG" 2>/dev/null || echo 0)
+  [ "$size" -gt "$LOG_MAX" ] && mv -f "$LOG" "$LOG.1"
   # Niveau RMS écrit 20 fois par seconde (trames de 800 échantillons à 16 kHz)
   # pour l'onde de la pastille ; astats ne modifie pas l'audio enregistré.
   # Le fichier croît d'environ 1,5 Ko/s, borné par MAX_SECONDS.
@@ -194,15 +198,20 @@ start_recording() {
       -af "aresample=16000,asetnsamples=n=800:p=0,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$LEVELS:direct=1" \
       -t "$MAX_SECONDS" -ar 16000 -ac 1 -y "$WAV" \
       >>"$LOG" 2>&1 &
-  local pid=$!
-  now >"$STARTED"
+  local pid=$! t0; t0=$(now)
+  echo "$t0" >"$STARTED"
   echo $pid >"$PID_FILE"
+  # À la limite, ffmpeg s'arrête seul (-t) : on transcrit alors comme sur un
+  # second appui. Une seconde de marge laisse ffmpeg finaliser le WAV ; expire
+  # vérifie pid et horodatage pour ne jamais couper une capture suivante.
+  nohup /bin/bash -c 'sleep "$1" && exec /bin/bash "$2" expire "$3" "$4"' _ \
+      "$((MAX_SECONDS + 1))" "$0" "$pid" "$t0" >>"$LOG" 2>&1 &
   listening 1
   log "capture démarrée (pid $pid)"
   remember_target   # après ffmpeg : ne pas retarder la capture
   ding Tink
 
-  printf 'recording' >"$STATUS"
+  printf 'recording %s' "$MAX_SECONDS" >"$STATUS"   # durée max : compte à rebours
   pkill -f "$OVERLAY" 2>/dev/null
   [ -x "$OVERLAY" ] && nohup "$OVERLAY" "$STATUS" "$MURMURE_HOME/murmure.sh" \
       >>"$LOG" 2>&1 &
@@ -233,7 +242,7 @@ stop_and_transcribe() {
 
   [ -s "$WAV" ] || die "Aucun fichier audio produit"
   local bytes; bytes=$(stat -f%z "$WAV")
-  [ "$bytes" -gt "$MIN_BYTES" ] || die "Trop court — garde la touche plus longtemps"
+  [ "$bytes" -gt "$MIN_BYTES" ] || die "Trop court — parle un peu plus longtemps"
 
   # Durée estimée de la transcription, pour la jauge de la pastille. Whisper ne
   # donne qu'une progression par fenêtre de 30 s : inexploitable sur une dictée.
@@ -262,11 +271,17 @@ stop_and_transcribe() {
     prompt_args=(--prompt "$(tr -d '\n' <"$PROMPT_FILE")" --carry-initial-prompt)
   fi
 
-  local text
+  local text rc
   text=$("$WHISPER_BIN" -m "$MODEL" -f "$WAV" -l "$LANGUAGE" \
-           "${prompt_args[@]}" ${WHISPER_ARGS[@]+"${WHISPER_ARGS[@]}"} \
-           --no-timestamps --no-prints 2>>"$LOG")
+           ${prompt_args[@]+"${prompt_args[@]}"} ${WHISPER_ARGS[@]+"${WHISPER_ARGS[@]}"} \
+           --no-timestamps --no-prints 2>"$WHISPER_ERR")
+  rc=$?
   text=$(printf '%s' "$text" | tr '\n' ' ' | sed -e 's/  */ /g' -e 's/^ *//' -e 's/ *$//')
+  # Les ~40 lignes Metal/ggml de chaque dictée ne vont au journal qu'en cas d'échec.
+  if [ "$rc" -ne 0 ] || ! has_speech "$text"; then
+    log "whisper-cli (code $rc) :"; cat "$WHISPER_ERR" >>"$LOG" 2>/dev/null
+  fi
+  rm -f "$WHISPER_ERR"
 
   # Dictionnaire de corrections : le prompt initial ne suffit pas sur l'anglais
   # technique (« commit » → « commis »). Édite corrections.txt pour l'enrichir.
@@ -331,6 +346,12 @@ toggle() {
 
 case "${1:-toggle}" in
   toggle|press) toggle ;;
+  expire)   # minuterie de start_recording : $2 pid ffmpeg, $3 horodatage
+    if [ "$(cat "$PID_FILE" 2>/dev/null)" = "${2:-}" ] \
+       && [ "$(cat "$STARTED" 2>/dev/null)" = "${3:-}" ]; then
+      log "durée maximale atteinte (${MAX_SECONDS} s)"
+      stop_and_transcribe
+    fi ;;
   release)
     if [ -f "$PID_FILE" ] && held_long_enough; then
       stop_and_transcribe
