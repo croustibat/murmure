@@ -64,7 +64,7 @@ mkdir -p "$APP/Contents/MacOS"
 cp "$SRC/app/Info.plist" "$APP/Contents/Info.plist"
 cat > "$APP/Contents/MacOS/Murmure" <<EXE
 #!/bin/bash
-exec "$MURMURE_HOME/murmure.sh"
+exec "$MURMURE_HOME/murmure.sh" "\$@"
 EXE
 chmod +x "$APP/Contents/MacOS/Murmure"
 codesign --force --sign - "$APP" >/dev/null 2>&1 || warn "signature ad-hoc impossible"
@@ -79,12 +79,19 @@ if [ -d "$HOME/.config/karabiner" ]; then
     "title": "Murmure",
     "rules": [
         {
-            "description": "Murmure : ⌘⇧E bascule dictée",
+            "description": "Murmure : ⌘⇧E dictée (appui bref : bascule, maintenu : parler), Échap annule",
             "manipulators": [
                 {
                     "type": "basic",
                     "from": { "key_code": "e", "modifiers": { "mandatory": ["command", "shift"] } },
-                    "to": [{ "shell_command": "/usr/bin/open -n -a '$APP'" }]
+                    "to": [{ "shell_command": "/usr/bin/open -n -a '$APP' --args press" }],
+                    "to_after_key_up": [{ "shell_command": "/usr/bin/open -n -a '$APP' --args release" }]
+                },
+                {
+                    "type": "basic",
+                    "from": { "key_code": "escape" },
+                    "conditions": [{ "type": "variable_if", "name": "murmure_ecoute", "value": 1 }],
+                    "to": [{ "shell_command": "/usr/bin/open -n -a '$APP' --args cancel" }]
                 }
             ]
         }
@@ -92,6 +99,7 @@ if [ -d "$HOME/.config/karabiner" ]; then
 }
 KB
   ok "règle déposée — active-la dans Karabiner > Complex Modifications > Add rule"
+  echo "    (si une ancienne règle Murmure est active, supprime-la puis ajoute la nouvelle)"
 else
   warn "Karabiner-Elements non détecté."
   echo "    Associe ce raccourci à la commande :"
@@ -111,6 +119,7 @@ Il reste deux autorisations à accorder, au ${bold}premier usage${off} :
 
 Sans la seconde, le texte va dans le presse-papiers et vous faites ⌘V.
 
-Essai : ⌘⇧E, parlez, ⌘⇧E.
+Essai : ⌘⇧E, parlez, ⌘⇧E — ou gardez ⌘⇧E enfoncé le temps de parler.
+Échap pendant l'écoute annule.
 Journal : /tmp/murmure-$(id -u)/murmure.log
 FIN

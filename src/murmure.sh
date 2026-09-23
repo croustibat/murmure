@@ -1,6 +1,8 @@
 #!/bin/bash
 # Murmure — dictée vocale locale pour macOS.
 # Bascule : un appui démarre la capture, un second transcrit et colle.
+# Sous-commandes : toggle (défaut), press / release (maintenir pour parler),
+# cancel (annuler l'écoute sans rien transcrire).
 # Lancé depuis Murmure.app pour disposer d'une identité TCC (autorisation Micro).
 set -uo pipefail
 
@@ -34,6 +36,9 @@ LOG="$STATE_DIR/murmure.log"
 STATUS="$STATE_DIR/status"
 BUSY="$STATE_DIR/transcribing.pid"
 TARGET="$STATE_DIR/target"   # app active au démarrage : « pid bundleid »
+STARTED="$STATE_DIR/started"   # horodatage du début de capture
+HOLD_MS="${MURMURE_HOLD_MS:-600}" # au-delà, relâcher la touche arrête la capture
+KARABINER_CLI="${MURMURE_KARABINER_CLI:-/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli}"
 OVERLAY="${MURMURE_OVERLAY:-$MURMURE_HOME/overlay}"
 mkdir -p "$STATE_DIR"
 
@@ -43,7 +48,30 @@ now()    { perl -MTime::HiRes=time -e 'printf "%.3f", time'; }
 log()    { printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$*" >>"$LOG"; }
 ding()   { afplay "/System/Library/Sounds/$1.aiff" >/dev/null 2>&1 & }
 notify() { osascript -e "display notification \"$1\" with title \"Murmure\"" >/dev/null 2>&1; }
-die()    { rm -f "$STATUS"; log "ERREUR: $*"; ding Basso; notify "$1"; exit 1; }
+die()    { rm -f "$STATUS"; listening 0; log "ERREUR: $*"; ding Basso; notify "$1"; exit 1; }
+
+# Variable Karabiner lue par la règle Échap : la touche n'est interceptée que
+# pendant l'écoute. Sans Karabiner, sans effet.
+listening() {
+  [ -x "$KARABINER_CLI" ] || return 0
+  "$KARABINER_CLI" --set-variables "{\"murmure_ecoute\":$1}" >>"$LOG" 2>&1
+}
+
+# Réclamation atomique de la capture : press, release et cancel tournent dans
+# des processus distincts, un seul doit l'arrêter.
+claim_capture() { mv "$PID_FILE" "$PID_FILE.$$" 2>/dev/null; }
+
+# Coupe ffmpeg (SIGINT pour qu'il finalise le WAV, SIGKILL en dernier recours).
+stop_ffmpeg() {
+  local pid; pid=$(cat "$PID_FILE.$$" 2>/dev/null)
+  rm -f "$PID_FILE.$$" "$STARTED" "$LEVELS"
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    kill -INT "$pid" 2>/dev/null
+    for _ in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || break; sleep 0.05; done
+    kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null
+  fi
+  listening 0
+}
 
 # App au premier plan, sous la forme « pid bundleid ».
 front_app() {
@@ -94,8 +122,11 @@ start_recording() {
       -af "aresample=16000,asetnsamples=n=800:p=0,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$LEVELS:direct=1" \
       -t "$MAX_SECONDS" -ar 16000 -ac 1 -y "$WAV" \
       >>"$LOG" 2>&1 &
-  echo $! >"$PID_FILE"
-  log "capture démarrée (pid $!)"
+  local pid=$!
+  now >"$STARTED"
+  echo $pid >"$PID_FILE"
+  listening 1
+  log "capture démarrée (pid $pid)"
   remember_target   # après ffmpeg : ne pas retarder la capture
   ding Tink
 
@@ -118,18 +149,12 @@ has_speech() {
 }
 
 stop_and_transcribe() {
-  # Verrou posé avant de retirer PID_FILE : un nouvel appui pendant la
+  # Verrou posé juste après la réclamation : un nouvel appui pendant la
   # transcription ne doit pas relancer une capture par-dessus.
+  claim_capture || exit 0
   echo $$ >"$BUSY"
   trap 'rm -f "$BUSY"' EXIT
-  local pid; pid=$(cat "$PID_FILE" 2>/dev/null)
-  rm -f "$PID_FILE"
-  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-    kill -INT "$pid" 2>/dev/null
-    for _ in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || break; sleep 0.05; done
-    kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null
-  fi
-  rm -f "$LEVELS"
+  stop_ffmpeg
   ding Pop
   printf 'transcribing' >"$STATUS"
   local t0; t0=$(now)
@@ -204,10 +229,44 @@ stop_and_transcribe() {
   rm -f "$STATUS" "$TARGET"
 }
 
-if [ -f "$PID_FILE" ]; then
-  stop_and_transcribe
-elif kill -0 "$(cat "$BUSY" 2>/dev/null)" 2>/dev/null; then
-  log "appui ignoré : transcription en cours"
-else
-  start_recording
-fi
+# Annulation : on coupe l'écoute, rien n'est transcrit ni collé.
+cancel_recording() {
+  claim_capture || return 0
+  stop_ffmpeg
+  rm -f "$WAV" "$STATUS" "$TARGET"
+  log "capture annulée"
+  ding Funk
+}
+
+# Relâchement : seul un appui maintenu au-delà de HOLD_MS arrête la capture ;
+# un appui bref la laisse tourner (mode bascule).
+held_long_enough() {
+  local t0; t0=$(cat "$STARTED" 2>/dev/null)
+  [ -n "$t0" ] || return 1
+  calc -v a="$t0" -v b="$(now)" -v h="$HOLD_MS" 'BEGIN { exit !((b - a) * 1000 >= h) }'
+}
+
+toggle() {
+  if [ -f "$PID_FILE" ]; then
+    stop_and_transcribe
+  elif kill -0 "$(cat "$BUSY" 2>/dev/null)" 2>/dev/null; then
+    log "appui ignoré : transcription en cours"
+  else
+    start_recording
+  fi
+}
+
+case "${1:-toggle}" in
+  toggle|press) toggle ;;
+  release)
+    if [ -f "$PID_FILE" ] && held_long_enough; then
+      stop_and_transcribe
+    fi ;;
+  cancel)
+    if [ -f "$PID_FILE" ]; then
+      cancel_recording
+    else
+      listening 0   # filet de sécurité : rien à annuler, on libère Échap
+    fi ;;
+  *) log "commande inconnue : $1"; exit 2 ;;
+esac

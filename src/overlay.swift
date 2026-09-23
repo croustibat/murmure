@@ -1,7 +1,7 @@
 import AppKit
 
 // Murmure — pastille flottante affichée pendant la dictée.
-// Onde animée + libellé + bouton stop. L'état est lu dans un fichier :
+// Onde animée + libellé + bouton stop + ✕ (annuler). L'état est lu dans un fichier :
 // « recording », « transcribing <durée estimée> », « pasting », et sa
 // disparition ferme la fenêtre. Pendant l'écoute, l'onde suit le niveau RMS
 // qu'écrit ffmpeg dans « levels », à côté du fichier d'état. Pendant la
@@ -22,12 +22,13 @@ final class PillView: NSView {
     var progress: CGFloat = 0   // 0…1, jauge affichée hors écoute
     var level: CGFloat = 0      // 0…1, niveau de la voix pendant l'écoute
     private var stopRect: NSRect = .zero
+    private var cancelRect: NSRect = .zero
 
     private let font = NSFont.systemFont(ofSize: 13, weight: .medium)
 
     var intrinsicWidth: CGFloat {
         let w = (label as NSString).size(withAttributes: [.font: font]).width
-        return 34 + 44 + 10 + w + 14 + 1 + 14 + 14 + 12
+        return 34 + 44 + 10 + w + 14 + 1 + 14 + 14 + 24 + 12
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -90,14 +91,36 @@ final class PillView: NSView {
         stopRect = NSRect(x: sepX + 14, y: midY - sq / 2, width: sq, height: sq)
         NSColor.white.withAlphaComponent(listening ? 0.92 : 0.35).setFill()
         NSBezierPath(roundedRect: stopRect, xRadius: 2.5, yRadius: 2.5).fill()
+
+        // ✕ : annuler sans transcrire
+        let cx: CGFloat = 9
+        cancelRect = NSRect(x: stopRect.maxX + 14, y: midY - cx / 2, width: cx, height: cx)
+        let cross = NSBezierPath()
+        cross.move(to: NSPoint(x: cancelRect.minX, y: cancelRect.minY))
+        cross.line(to: NSPoint(x: cancelRect.maxX, y: cancelRect.maxY))
+        cross.move(to: NSPoint(x: cancelRect.minX, y: cancelRect.maxY))
+        cross.line(to: NSPoint(x: cancelRect.maxX, y: cancelRect.minY))
+        cross.lineWidth = 1.8
+        cross.lineCapStyle = .round
+        NSColor.white.withAlphaComponent(listening ? 0.6 : 0.2).setStroke()
+        cross.stroke()
     }
 
     override func mouseDown(with event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
-        guard listening, stopRect.insetBy(dx: -10, dy: -10).contains(p) else { return }
+        guard listening else { return }
+        // ✕ testé en premier : sa zone de clic touche celle du carré.
+        if cancelRect.insetBy(dx: -6, dy: -10).contains(p) {
+            run("cancel")
+        } else if stopRect.insetBy(dx: -10, dy: -10).contains(p) {
+            run("toggle")
+        }
+    }
+
+    private func run(_ command: String) {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/bash")
-        task.arguments = [toggleScript]
+        task.arguments = [toggleScript, command]
         try? task.run()
     }
 }

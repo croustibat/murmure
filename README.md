@@ -52,7 +52,8 @@ arrive dans le presse-papiers et vous faites ⌘V vous-même.
 
 Avec [Karabiner-Elements](https://karabiner-elements.pqrs.org), la règle est déposée
 automatiquement : activez-la dans **Complex Modifications > Add rule**. Elle utilise
-⌘⇧E — et non ⌘E, qui priverait le Finder de « Éjecter ».
+⌘⇧E — et non ⌘E, qui priverait le Finder de « Éjecter ». Après une mise à jour,
+supprimez l'ancienne règle Murmure puis ajoutez la nouvelle.
 
 Sans Karabiner, associez ce raccourci avec l'outil de votre choix :
 
@@ -60,11 +61,25 @@ Sans Karabiner, associez ce raccourci avec l'outil de votre choix :
 /usr/bin/open -n -a ~/Applications/Murmure.app
 ```
 
+Sans argument, Murmure bascule (un appui démarre, le suivant arrête). Pour le
+maintien et l'annulation, l'outil doit appeler `--args press` à l'appui,
+`--args release` au relâchement et `--args cancel` pour annuler.
+
 ## Utilisation
 
-**⌘⇧E** démarre l'écoute — la pastille apparaît. Parlez. **⌘⇧E** à nouveau : le texte
-est transcrit puis collé. Vous pouvez aussi cliquer le carré de la pastille pour
-arrêter.
+Deux modes, sans réglage :
+
+- **Appui bref : bascule.** **⌘⇧E** démarre l'écoute — la pastille apparaît. Parlez.
+  **⌘⇧E** à nouveau : le texte est transcrit puis collé.
+- **Appui maintenu : parler.** Gardez **⌘⇧E** enfoncé le temps de parler ; le
+  relâchement lance la transcription. Le seuil entre les deux est de 600 ms
+  (`MURMURE_HOLD_MS`).
+
+Vous pouvez aussi cliquer le carré de la pastille pour arrêter et transcrire.
+
+**Annuler** une dictée ratée : **Échap** pendant l'écoute (règle Karabiner), ou le ✕ de la pastille.
+L'enregistrement est jeté, rien n'est collé. Échap n'est intercepté que pendant
+l'écoute : le reste du temps, il garde son rôle normal dans toutes les applications.
 
 Le presse-papiers contient toujours la dernière transcription : si le collage échoue,
 ⌘V la récupère.
@@ -94,6 +109,7 @@ Quelques variables d'environnement permettent d'ajuster le reste :
 | `MURMURE_LANG` | `fr` | langue de transcription |
 | `MURMURE_DEVICE` | `:0` | index du micro (`ffmpeg -f avfoundation -list_devices true -i ""`) |
 | `MURMURE_MAX` | `300` | durée maximale d'un enregistrement, en secondes |
+| `MURMURE_HOLD_MS` | `600` | au-delà, relâcher ⌘⇧E arrête l'écoute (appui maintenu) |
 | `MURMURE_SILENCE_DB` | `-70` | seuil en dessous duquel l'audio est jugé muet |
 
 ## Comment ça marche
