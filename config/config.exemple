@@ -40,5 +40,10 @@
 # Mac dans historique.jsonl, jamais envoyé nulle part. 0 : rien n'est enregistré.
 #MURMURE_HISTORY=1
 
+# Vérification des nouvelles versions, une fois par jour : la seule requête
+# réseau de Murmure (lecture de la dernière version publiée sur GitHub, rien
+# n'est envoyé). 0 pour la désactiver ; lu par Murmure.app à son lancement.
+#MURMURE_CHECK_UPDATES=1
+
 # Réservé à une version à venir, sans effet pour l'instant.
 #MURMURE_RESTORE_CLIPBOARD=0
