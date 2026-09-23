@@ -20,7 +20,7 @@ MURMURE_HOME="${MURMURE_HOME:-$HOME/.local/share/murmure}"
 # d'environnement l'emporte sur le fichier. Les clés réservées (raccourci lu par
 # l'app, presse-papiers) sont acceptées mais pas encore utilisées.
 CONFIG="$MURMURE_HOME/config"
-CONFIG_KEYS=" MURMURE_LANG MURMURE_DEVICE MURMURE_MAX MURMURE_SILENCE_DB MURMURE_HOLD_MS MURMURE_WHISPER_ARGS MURMURE_SHORTCUT MURMURE_HISTORY MURMURE_RESTORE_CLIPBOARD "
+CONFIG_KEYS=" MURMURE_LANG MURMURE_DEVICE MURMURE_MAX MURMURE_SILENCE_DB MURMURE_HOLD_MS MURMURE_WHISPER_ARGS MURMURE_SHORTCUT MURMURE_HISTORY MURMURE_RESTORE_CLIPBOARD MURMURE_CHECK_UPDATES "
 CONFIG_NOTES=()   # anomalies, journalisées une fois le journal disponible
 load_config() {
   [ -r "$CONFIG" ] || return 0

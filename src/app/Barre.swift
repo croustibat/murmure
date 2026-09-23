@@ -15,6 +15,7 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let bascule = NSMenuItem(title: "Démarrer la dictée", action: #selector(basculer), keyEquivalent: "")
     private let demarrage = NSMenuItem(title: "Ouvrir au démarrage", action: #selector(changerDemarrage), keyEquivalent: "")
     private let historique = Historique()
+    private let misesAJour = MisesAJour()
     private var raccourcis: Raccourcis!
     private var etat: Etat?
     private var enfonce = false   // touche du raccourci actuellement enfoncée
@@ -28,6 +29,7 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         surveiller()
         lireEtat()
         journal("Murmure \(versionMurmure) prête (\(murmureHome))")
+        misesAJour.demarrer()
     }
 
     private func construireMenu() {
@@ -46,7 +48,7 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let quitter = NSMenuItem(title: "Quitter Murmure", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         for i in [ligneEtat, ligneRaccourci, bascule, .separator(), dernieres, .separator(),
-                  reglages, demarrage, journalItem, .separator(), versionItem, quitter] {
+                  reglages, demarrage, journalItem, .separator(), misesAJour.disponible, versionItem, misesAJour.rechercher, quitter] {
             menu.addItem(i)
         }
         menu.autoenablesItems = false

@@ -5,7 +5,9 @@ Un raccourci, vous parlez, le texte s'écrit dans l'application active.
 
 ![Murmure en écoute](docs/apercu-ecoute.png)
 
-Pas de compte, pas d'abonnement, pas de clé API, aucune donnée qui sort de votre Mac.
+Pas de compte, pas d'abonnement, pas de clé API, aucune donnée qui sort de votre Mac
+(la seule requête réseau lit le numéro de la dernière version publiée, voir
+[Réseau](#réseau)).
 Votre voix est transcrite par [whisper.cpp](https://github.com/ggerganov/whisper.cpp)
 tournant en local.
 
@@ -42,7 +44,8 @@ L'installeur pose `ffmpeg` et `whisper-cpp`, télécharge le modèle (~550 Mo, u
 compile la pastille et l'app `~/Applications/Murmure.app`, puis la lance : son icône
 apparaît dans la barre des menus.
 
-Pour mettre à jour, `git pull` puis `./install.sh` à nouveau. L'installeur ne remplace
+Le menu signale une nouvelle version (« Version X.Y.Z disponible », qui ouvre la page
+de la release). Pour mettre à jour, `git pull` puis `./install.sh` à nouveau. L'installeur ne remplace
 que ce qui a changé et l'annonce en fin d'installation : tant que `Murmure.app` est
 inchangée, elle n'est ni recréée ni re-signée et macOS conserve les autorisations.
 Le modèle est vérifié par son empreinte SHA-256 ; un téléchargement interrompu reprend
@@ -99,7 +102,10 @@ Commandes : `toggle` (bascule), `press` à l'appui et `release` au relâchement
 L'icône de la barre des menus change pendant l'écoute et la transcription. Son menu
 donne l'état et le raccourci, démarre ou arrête une dictée, ouvre le journal, affiche
 la version, et propose **Ouvrir au démarrage** pour lancer Murmure à l'ouverture de
-session. Murmure ne garde aucun modèle en mémoire entre deux dictées.
+session. **Rechercher les mises à jour…** interroge GitHub sur-le-champ ; quand une
+version plus récente est publiée, l'entrée **Version X.Y.Z disponible** apparaît au-dessus
+du numéro de version et ouvre la page de la release. Rien n'est téléchargé ni installé
+automatiquement. Murmure ne garde aucun modèle en mémoire entre deux dictées.
 
 **Dernières dictées** liste les 10 plus récentes, avec leur heure ; un clic copie le
 texte dans le presse-papiers, pratique quand le collage a échoué ou pour réutiliser
@@ -164,6 +170,7 @@ autre qu'un code comme `fr` ou `auto`) est ignorée et signalée dans le journal
 | `MURMURE_WHISPER_ARGS` | _(vide)_ | options ajoutées à `whisper-cli`, par exemple `-bs 1 -bo 1` |
 | `MURMURE_SHORTCUT` | `cmd+shift+e` | raccourci global, lu par `Murmure.app` à son lancement (voir « Le raccourci ») |
 | `MURMURE_HISTORY` | `1` | `0` : les dictées ne sont plus enregistrées dans l'historique (voir « Le menu ») |
+| `MURMURE_CHECK_UPDATES` | `1` | `0` coupe la vérification des nouvelles versions, lu par `Murmure.app` à son lancement (voir « Réseau ») |
 
 `MURMURE_RESTORE_CLIPBOARD` est réservée à une version à venir et encore sans effet.
 
@@ -227,6 +234,26 @@ Le bundle `.app` n'est pas cosmétique : un script nu n'a pas d'identité TCC, m
 propose donc jamais l'autorisation micro et lui livre **un flux muet** au lieu d'une
 erreur. Whisper, n'entendant rien, invente alors des génériques de sous-titres.
 
+## Réseau
+
+La transcription ne quitte jamais votre Mac. Murmure fait une seule requête réseau :
+**au plus une fois par jour** (et quand vous choisissez « Rechercher les mises à
+jour… »), l'app lit la dernière version publiée sur
+`https://api.github.com/repos/croustibat/murmure/releases/latest`. C'est une simple
+lecture d'une page publique : aucune donnée n'est envoyée, ni texte, ni audio, ni
+identifiant. GitHub ne reçoit que ce que porte toute requête web : votre adresse IP, et
+le numéro de version de Murmure dans l'en-tête `User-Agent`. Hors ligne ou
+en cas d'erreur, rien ne s'affiche ; le journal en garde une ligne.
+
+Pour la couper, ajoutez dans `~/.local/share/murmure/config`, puis quittez et rouvrez
+Murmure :
+
+```
+MURMURE_CHECK_UPDATES=0
+```
+
+Plus aucune requête n'est faite et l'entrée « Rechercher les mises à jour… » disparaît.
+
 ## Dépannage
 
 Le journal dit toujours ce qui s'est passé :
@@ -257,6 +284,11 @@ d'environ 1 Mo, le journal est renommé `murmure.log.1` et repart de zéro.
 
 Le script quitte Murmure, retire le lancement au démarrage, l'app, le modèle et les
 fichiers de `~/.local/share/murmure`.
+
+## Contribuer
+
+La publication d'une version (fichier `VERSION`, étiquette, GitHub Release) est décrite
+dans [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 
