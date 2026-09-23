@@ -29,6 +29,7 @@ CADENCE="${MURMURE_CADENCE:-$MURMURE_HOME/cadence}"   # vitesse mesurée de la m
 STATE_DIR="${MURMURE_STATE_DIR:-/tmp/murmure-$(id -u)}"
 PID_FILE="$STATE_DIR/ffmpeg.pid"
 WAV="$STATE_DIR/recording.wav"
+LEVELS="$STATE_DIR/levels"   # niveau RMS de la voix, lu par la pastille
 LOG="$STATE_DIR/murmure.log"
 STATUS="$STATE_DIR/status"
 BUSY="$STATE_DIR/transcribing.pid"
@@ -46,9 +47,13 @@ die()    { rm -f "$STATUS"; log "ERREUR: $*"; ding Basso; notify "$1"; exit 1; }
 start_recording() {
   [ -x "$FFMPEG_BIN" ] || die "ffmpeg introuvable"
   [ -f "$MODEL" ]      || die "Modèle Whisper introuvable"
-  rm -f "$WAV"
+  rm -f "$WAV" "$LEVELS"
+  # Niveau RMS écrit 20 fois par seconde (trames de 800 échantillons à 16 kHz)
+  # pour l'onde de la pastille ; astats ne modifie pas l'audio enregistré.
+  # Le fichier croît d'environ 1,5 Ko/s, borné par MAX_SECONDS.
   nohup "$FFMPEG_BIN" -hide_banner -loglevel error \
       -f avfoundation -i "$DEVICE" \
+      -af "aresample=16000,asetnsamples=n=800:p=0,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$LEVELS:direct=1" \
       -t "$MAX_SECONDS" -ar 16000 -ac 1 -y "$WAV" \
       >>"$LOG" 2>&1 &
   echo $! >"$PID_FILE"
@@ -85,6 +90,7 @@ stop_and_transcribe() {
     for _ in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || break; sleep 0.05; done
     kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null
   fi
+  rm -f "$LEVELS"
   ding Pop
   printf 'transcribing' >"$STATUS"
   local t0; t0=$(now)
