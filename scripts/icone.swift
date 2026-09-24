@@ -16,7 +16,7 @@
 // Aux petites tailles, l'onde passe à moins de barres, plus épaisses et calées
 // sur les pixels, pour rester lisible à 16 px.
 //
-// --variante choisit le fond (1 par défaut) ; --planche écrit en plus un aperçu des
+// --variante choisit le fond (2 par défaut, la variante retenue) ; --planche écrit en plus un aperçu des
 // variantes à 1024, 256, 64, 32 et 16 px, sur fond clair et sombre.
 
 import AppKit
@@ -302,7 +302,7 @@ func planche(_ url: URL) {
 
 // MARK: - Programme
 
-var numero = 1
+var numero = 2   // variante retenue : dégradé indigo → violet
 var cheminPlanche: String?
 var args = CommandLine.arguments.dropFirst().makeIterator()
 while let a = args.next() {
