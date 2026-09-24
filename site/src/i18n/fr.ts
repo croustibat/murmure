@@ -168,6 +168,16 @@ export default {
       },
     ],
   },
+  family: {
+    title: 'Aussi par Ultraviolettes',
+    lead: 'Des outils macOS qui travaillent sur votre Mac, pas dans le cloud.',
+    sillage: {
+      name: 'Sillage',
+      text: 'Vos réunions laissent une trace : enregistrement, transcription et compte rendu. Sur votre Mac.',
+      link: 'Découvrir Sillage',
+      href: 'https://sillage-mac.vercel.app/',
+    },
+  },
   footer: {
     license: 'Licence MIT',
     by: 'Par',

@@ -33,7 +33,12 @@ const bouton =
 
 <Base langue={langue} t={t}>
   <header class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-5">
-    <a href={accueil} class="text-lg font-semibold tracking-tight" aria-label={t.nav.home}>
+    <a
+      href={accueil}
+      class="flex items-center gap-2.5 font-display text-lg font-semibold tracking-tight"
+      aria-label={t.nav.home}
+    >
+      <img src="/icone-512.png" alt="" width="32" height="32" class="size-8" />
       Murmure
     </a>
     <nav class="flex items-center gap-1 text-sm sm:gap-2">
@@ -53,7 +58,33 @@ const bouton =
 
   <main id="contenu">
     <!-- En-tête -->
-    <section class="mx-auto max-w-5xl px-5 pt-10 pb-20 text-center sm:pt-16">
+    <section class="relative isolate overflow-hidden">
+      <!-- Halo violet et arcs, comme les ondes de Sillage. -->
+      <div
+        aria-hidden="true"
+        class="absolute inset-x-0 -top-40 -z-10 mx-auto h-[36rem] max-w-4xl rounded-full bg-[radial-gradient(closest-side,rgba(109,40,217,0.35),transparent)] blur-2xl"
+      >
+      </div>
+      <svg
+        aria-hidden="true"
+        class="absolute -right-40 bottom-0 -z-10 w-[56rem] max-w-none text-accent opacity-[0.12]"
+        viewBox="0 0 900 500"
+        fill="none"
+      >
+        {
+          [0, 1, 2, 3, 4].map((i) => (
+            <ellipse cx="900" cy="560" rx={320 + i * 120} ry={220 + i * 80} stroke="currentColor" />
+          ))
+        }
+      </svg>
+    <div class="mx-auto max-w-5xl px-5 pt-10 pb-20 text-center sm:pt-16">
+      <img
+        src="/icone-512.png"
+        alt=""
+        width="96"
+        height="96"
+        class="mx-auto mb-6 size-20 drop-shadow-[0_12px_30px_rgba(109,40,217,0.45)] sm:size-24"
+      />
       <p class="text-sm font-medium tracking-wide text-accent uppercase">{t.hero.eyebrow}</p>
       <h1
         class="mx-auto mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-6xl"
@@ -61,7 +92,10 @@ const bouton =
       />
       <p class="mx-auto mt-6 max-w-2xl text-lg text-pretty text-doux sm:text-xl">{t.hero.lead}</p>
       <div class="mt-8 flex flex-wrap justify-center gap-3">
-        <a href="#installation" class={`${bouton} bg-accent text-sur-accent hover:bg-accent-fort`}>
+        <a
+          href="#installation"
+          class={`${bouton} bg-marque text-white shadow-lg shadow-violet-900/40 hover:brightness-110`}
+        >
           {t.hero.install}
         </a>
         <a href={depot} class={`${bouton} border border-bord bg-surface hover:border-doux`}>
@@ -94,6 +128,7 @@ const bouton =
           ))
         }
       </ul>
+    </div>
     </section>
 
     <!-- Local et privé -->
@@ -189,7 +224,7 @@ const bouton =
           </ul>
           <h3 class="mt-8 font-semibold">{t.install.commandsTitle}</h3>
           <pre
-            class="mt-3 overflow-x-auto rounded-xl bg-[#1c1c1e] p-4 text-sm leading-relaxed text-[#f2f1ef]"
+            class="mt-3 overflow-x-auto rounded-xl border border-bord bg-[#0b0718] p-4 text-sm leading-relaxed text-texte"
             tabindex="0"><code>{commandes}</code></pre>
           <p class="mt-4 text-doux" set:html={t.install.after} />
         </div>
@@ -249,6 +284,26 @@ const bouton =
           }
         </div>
       </div>
+    </section>
+    <!-- Famille Ultraviolettes -->
+    <section class="mx-auto max-w-5xl px-5 py-20" aria-labelledby="famille">
+      <h2 id="famille" class="text-3xl font-semibold tracking-tight sm:text-4xl">
+        {t.family.title}
+      </h2>
+      <p class="mt-3 max-w-2xl text-lg text-doux">{t.family.lead}</p>
+      <a
+        href={t.family.sillage.href}
+        class="group mt-10 flex max-w-2xl items-start gap-5 rounded-2xl border border-[#29444c] bg-[#0c2229] p-6 transition-colors hover:border-[#b3e3d9]/60"
+      >
+        <img src="/sillage.svg" alt="" width="56" height="56" class="size-14 shrink-0" />
+        <div>
+          <p class="font-display text-xl font-semibold text-[#edf5f2]">{t.family.sillage.name}</p>
+          <p class="mt-1 text-[#a9c1c3]">{t.family.sillage.text}</p>
+          <p class="mt-3 font-medium text-[#b3e3d9]">
+            {t.family.sillage.link} <span aria-hidden="true" class="inline-block transition-transform group-hover:translate-x-0.5">→</span>
+          </p>
+        </div>
+      </a>
     </section>
   </main>
 

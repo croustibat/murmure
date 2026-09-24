@@ -167,6 +167,16 @@ const en: typeof fr = {
       },
     ],
   },
+  family: {
+    title: 'Also by Ultraviolettes',
+    lead: 'macOS tools that work on your Mac, not in the cloud.',
+    sillage: {
+      name: 'Sillage',
+      text: 'Your meetings leave a trace: recording, transcription and meeting notes. On your Mac.',
+      link: 'Discover Sillage',
+      href: 'https://sillage-mac.vercel.app/en/',
+    },
+  },
   footer: {
     license: 'MIT license',
     by: 'By',

@@ -1,10 +1,14 @@
 @import 'tailwindcss';
 
-/* Couleurs suivant le thème du système : les variables changent en sombre,
-   les utilitaires Tailwind (bg-fond, text-texte…) restent les mêmes. */
+/* Identité des outils macOS Ultraviolettes (comme Sillage) : fond sombre teinté
+   de la couleur de l'app — violet pour Murmure —, titres en Avenir Next, texte
+   en police système. Les utilitaires Tailwind (bg-fond, text-texte…) lisent
+   ces variables. */
 @theme {
   --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Avenir Next', Avenir, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
   --color-fond: var(--fond);
@@ -18,28 +22,17 @@
 }
 
 :root {
-  color-scheme: light dark;
-  --fond: #faf9f7;
-  --surface: #ffffff;
-  --bord: #e4e1dc;
-  --texte: #1c1b1a;
-  --doux: #57534e;
-  --accent: #4338ca;
-  --accent-fort: #3730a3;
-  --sur-accent: #ffffff;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fond: #121212;
-    --surface: #1c1c1e;
-    --bord: #33322f;
-    --texte: #f2f1ef;
-    --doux: #b5b1ab;
-    --accent: #a5b4fc;
-    --accent-fort: #c7d2fe;
-    --sur-accent: #1e1b4b;
-  }
+  color-scheme: dark;
+  --fond: #110b22;
+  --surface: #1a1231;
+  --bord: #2e2450;
+  --texte: #f3f0fb;
+  --doux: #b8afd4;
+  --accent: #a78bfa;
+  --accent-fort: #c4b5fd;
+  --sur-accent: #1b0f3a;
+  /* Dégradé de l'icône de l'app (scripts/icone.swift, variante 2). */
+  --marque: linear-gradient(135deg, #4338ca 0%, #6d28d9 60%, #5b21b6 100%);
 }
 
 @layer base {
@@ -54,6 +47,15 @@
   }
   body {
     @apply bg-fond text-texte font-sans antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+  }
+  ::selection {
+    background: var(--accent);
+    color: var(--sur-accent);
   }
   :focus-visible {
     outline: 2px solid var(--accent);
@@ -78,4 +80,9 @@
   & a {
     @apply text-accent underline decoration-1 underline-offset-2 hover:text-accent-fort;
   }
+}
+
+/* Bouton principal aux couleurs de l'icône. */
+@utility bg-marque {
+  background-image: var(--marque);
 }
