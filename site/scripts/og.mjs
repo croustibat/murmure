@@ -8,7 +8,7 @@ import { existsSync } from 'node:fs';
 import sharp from 'sharp';
 
 const pub = new URL('../public/', import.meta.url);
-const police = "-apple-system, 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+const police = "'Avenir Next', -apple-system, 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 
 // Pastille de l'app (src/overlay.swift) à l'échelle k, coin haut-gauche en x, y.
 function pastille(x, y, k, libelle, largeurLibelle) {
@@ -64,15 +64,15 @@ for (const l of langues) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
     <defs>
       <radialGradient id="halo" cx="50%" cy="100%" r="75%">
-        <stop offset="0" stop-color="#4338ca" stop-opacity="0.35"/>
-        <stop offset="1" stop-color="#4338ca" stop-opacity="0"/>
+        <stop offset="0" stop-color="#6d28d9" stop-opacity="0.45"/>
+        <stop offset="1" stop-color="#6d28d9" stop-opacity="0"/>
       </radialGradient>
     </defs>
-    <rect width="1200" height="630" fill="#121212"/>
+    <rect width="1200" height="630" fill="#110b22"/>
     <rect width="1200" height="630" fill="url(#halo)"/>
-    <text x="600" y="190" text-anchor="middle" font-family="${police}" font-weight="700" font-size="96" fill="#f2f1ef">Murmure</text>
-    <text x="600" y="268" text-anchor="middle" font-family="${police}" font-weight="500" font-size="40" fill="#f2f1ef">${l.accroche}</text>
-    <text x="600" y="322" text-anchor="middle" font-family="${police}" font-size="32" fill="#b5b1ab">${l.detail}</text>
+    <text x="600" y="190" text-anchor="middle" font-family="${police}" font-weight="700" font-size="96" fill="#f3f0fb">Murmure</text>
+    <text x="600" y="268" text-anchor="middle" font-family="${police}" font-weight="500" font-size="40" fill="#f3f0fb">${l.accroche}</text>
+    <text x="600" y="322" text-anchor="middle" font-family="${police}" font-size="32" fill="#b8afd4">${l.detail}</text>
     <g transform="translate(${px} 400)">${p.svg}</g>
   </svg>`;
   await sharp(Buffer.from(svg)).png().toFile(new URL(l.fichier, pub).pathname);
