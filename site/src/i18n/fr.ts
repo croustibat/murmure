@@ -127,7 +127,7 @@ export default {
     ],
     commandsTitle: 'Dans un terminal',
     after:
-      'L’installeur pose <code>ffmpeg</code> et <code>whisper-cpp</code>, télécharge le modèle (~550 Mo, une fois), compile la pastille et l’app <code>~/Applications/Murmure.app</code>, puis la lance : son icône apparaît dans la barre des menus.',
+      'L’installeur pose <code>ffmpeg</code> et <code>whisper-cpp</code>, télécharge le modèle (~550 Mo, une fois), compile la pastille et l’app <code>/Applications/Murmure.app</code>, puis la lance : son icône apparaît dans la barre des menus.',
     permissionsTitle: 'Deux autorisations',
     permissions: [
       {
@@ -136,7 +136,7 @@ export default {
       },
       {
         title: 'Accessibilité',
-        text: 'Pour que le texte se colle tout seul, ajoutez <code>Murmure.app</code> dans <strong>Réglages Système › Confidentialité et sécurité › Accessibilité</strong>. Sans cela, le texte arrive dans le presse-papiers et vous faites <kbd>⌘V</kbd> vous-même.',
+        text: 'Pour que le texte se colle tout seul, ajoutez <code>Murmure.app</code> dans <strong>Réglages Système › Confidentialité et sécurité › Accessibilité</strong>. Sans cela, le texte arrive dans le presse-papiers et vous faites <kbd>⌘V</kbd> vous-même. Tant qu’une autorisation manque, le menu de Murmure le signale et ouvre le bon panneau des Réglages.',
       },
     ],
     ready: 'C’est prêt : <kbd>⌘⇧E</kbd>, parlez, <kbd>⌘⇧E</kbd>.',

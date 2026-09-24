@@ -126,7 +126,7 @@ const en: typeof fr = {
     ],
     commandsTitle: 'In a terminal',
     after:
-      'The installer sets up <code>ffmpeg</code> and <code>whisper-cpp</code>, downloads the model (~550 MB, once), builds the pill and <code>~/Applications/Murmure.app</code>, then launches it: its icon shows up in the menu bar.',
+      'The installer sets up <code>ffmpeg</code> and <code>whisper-cpp</code>, downloads the model (~550 MB, once), builds the pill and <code>/Applications/Murmure.app</code>, then launches it: its icon shows up in the menu bar.',
     permissionsTitle: 'Two permissions',
     permissions: [
       {
@@ -135,7 +135,7 @@ const en: typeof fr = {
       },
       {
         title: 'Accessibility',
-        text: 'For the text to paste itself, add <code>Murmure.app</code> under <strong>System Settings › Privacy &amp; Security › Accessibility</strong>. Without it, the text lands on the clipboard and you press <kbd>⌘V</kbd> yourself.',
+        text: 'For the text to paste itself, add <code>Murmure.app</code> under <strong>System Settings › Privacy &amp; Security › Accessibility</strong>. Without it, the text lands on the clipboard and you press <kbd>⌘V</kbd> yourself. While a permission is missing, Murmure’s menu says so and opens the right Settings pane.',
       },
     ],
     ready: 'You’re set: <kbd>⌘⇧E</kbd>, talk, <kbd>⌘⇧E</kbd>.',
