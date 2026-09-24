@@ -162,14 +162,14 @@ fi
 # propose jamais l'autorisation micro et livre un flux muet à la place.
 # Les autorisations Micro et Accessibilité suivent la signature : on ne recrée ni
 # ne re-signe le bundle que si son contenu change. swiftc ne produisant pas deux
-# fois le même binaire, Info.plist porte l'empreinte des sources de l'app et du
-# compilateur : l'app n'est recompilée que si cette empreinte change. Les mises à
-# jour de murmure.sh ne la touchent pas.
+# fois le même binaire, Info.plist porte l'empreinte des sources de l'app, de son
+# icône et du compilateur : l'app n'est recompilée que si cette empreinte change.
+# Les mises à jour de murmure.sh ne la touchent pas.
 step "Création de Murmure.app"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 VERSION="$(tr -d '[:space:]' < "$SRC/VERSION")"
-APP_SUM="$( { cat "$SRC"/src/app/*.swift | shasum -a 256; swiftc --version 2>&1 | head -1; } | shasum -a 256 | cut -d' ' -f1)"
+APP_SUM="$( { cat "$SRC"/src/app/*.swift | shasum -a 256; shasum -a 256 < "$SRC/app/Murmure.icns"; swiftc --version 2>&1 | head -1; } | shasum -a 256 | cut -d' ' -f1)"
 cp "$SRC/app/Info.plist" "$STAGE/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$VERSION" "$STAGE/Info.plist"
 plutil -replace CFBundleVersion -string "$VERSION" "$STAGE/Info.plist"
@@ -178,6 +178,7 @@ plutil -replace MurmureSourceSum -string "$APP_SUM" "$STAGE/Info.plist"
 if [ -d "$APP" ] \
    && cmp -s "$STAGE/Info.plist" "$APP/Contents/Info.plist" \
    && [ -x "$APP/Contents/MacOS/Murmure" ] \
+   && cmp -s "$SRC/app/Murmure.icns" "$APP/Contents/Resources/Murmure.icns" \
    && codesign --verify "$APP" >/dev/null 2>&1; then
   ok "$APP inchangée — signature et autorisations conservées"
   note "Murmure.app : inchangée"
@@ -201,9 +202,10 @@ else
   fi
   mkdir -p "$APP_DIR"
   rm -rf "$APP"
-  mkdir -p "$APP/Contents/MacOS"
+  mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
   cp "$STAGE/Info.plist" "$APP/Contents/Info.plist"
   cp "$STAGE/Murmure" "$APP/Contents/MacOS/Murmure"
+  cp "$SRC/app/Murmure.icns" "$APP/Contents/Resources/Murmure.icns"
   chmod +x "$APP/Contents/MacOS/Murmure"
   codesign --force --sign - "$APP" >/dev/null 2>&1 || warn "signature ad-hoc impossible"
   ok "$APP ($VERSION)"
