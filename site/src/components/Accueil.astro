@@ -1,0 +1,269 @@
+---
+// La page complète, commune aux deux langues : seuls les textes changent.
+import { Picture } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import Pastille from './Pastille.astro';
+import { depot, langues, type Langue } from '../i18n';
+import ecoute from '../../../docs/apercu-ecoute.png';
+import transcription from '../../../docs/apercu-transcription.png';
+import compteARebours from '../../../docs/apercu-compte-a-rebours.png';
+import reglages from '../../../docs/apercu-reglages.png';
+
+interface Props {
+  langue: Langue;
+}
+const { langue } = Astro.props;
+const t = langues[langue];
+const autre = langue === 'fr' ? { href: '/en/', lang: 'en' } : { href: '/', lang: 'fr' };
+const accueil = langue === 'fr' ? '/' : '/en/';
+
+const pastilles = [
+  { src: ecoute, ...t.shots.items.ecoute },
+  { src: transcription, ...t.shots.items.transcription },
+  { src: compteARebours, ...t.shots.items.compteARebours },
+];
+
+const commandes = `git clone https://github.com/croustibat/murmure.git
+cd murmure
+./install.sh`;
+
+const bouton =
+  'inline-flex items-center justify-center rounded-full px-5 py-2.5 font-medium transition-colors';
+---
+
+<Base langue={langue} t={t}>
+  <header class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-5">
+    <a href={accueil} class="text-lg font-semibold tracking-tight" aria-label={t.nav.home}>
+      Murmure
+    </a>
+    <nav class="flex items-center gap-1 text-sm sm:gap-2">
+      <a href="#installation" class="rounded-full px-3 py-2 hover:bg-surface">{t.nav.install}</a>
+      <a href={depot} class="rounded-full px-3 py-2 hover:bg-surface">{t.nav.github}</a>
+      <a
+        href={autre.href}
+        hreflang={autre.lang}
+        lang={autre.lang}
+        aria-label={t.nav.otherLangLabel}
+        class="rounded-full border border-bord px-3 py-1.5 hover:bg-surface"
+      >
+        {t.nav.otherLang}
+      </a>
+    </nav>
+  </header>
+
+  <main id="contenu">
+    <!-- En-tête -->
+    <section class="mx-auto max-w-5xl px-5 pt-10 pb-20 text-center sm:pt-16">
+      <p class="text-sm font-medium tracking-wide text-accent uppercase">{t.hero.eyebrow}</p>
+      <h1
+        class="mx-auto mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-6xl"
+        set:html={t.hero.title}
+      />
+      <p class="mx-auto mt-6 max-w-2xl text-lg text-pretty text-doux sm:text-xl">{t.hero.lead}</p>
+      <div class="mt-8 flex flex-wrap justify-center gap-3">
+        <a href="#installation" class={`${bouton} bg-accent text-sur-accent hover:bg-accent-fort`}>
+          {t.hero.install}
+        </a>
+        <a href={depot} class={`${bouton} border border-bord bg-surface hover:border-doux`}>
+          {t.hero.github}
+        </a>
+      </div>
+      <div class="mt-14 flex justify-center">
+        <Pastille
+          label={t.pill.label}
+          ecoute={t.pill.listening}
+          transcription={t.pill.transcribing}
+        />
+      </div>
+      <ul class="mt-12 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-doux">
+        {
+          t.hero.promises.map((p) => (
+            <li class="flex items-center gap-2">
+              <svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 text-accent">
+                <path
+                  d="M3 8.5l3 3 7-7"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              {p}
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <!-- Local et privé -->
+    <section class="border-y border-bord bg-surface" aria-labelledby="prive">
+      <div class="mx-auto max-w-5xl px-5 py-20">
+        <h2 id="prive" class="text-3xl font-semibold tracking-tight sm:text-4xl">
+          {t.privacy.title}
+        </h2>
+        <p class="mt-3 max-w-2xl text-lg text-doux">{t.privacy.lead}</p>
+        <div class="mt-10 grid gap-8 sm:grid-cols-2">
+          {
+            t.privacy.items.map((item) => (
+              <div>
+                <h3 class="font-semibold">{item.title}</h3>
+                <p class="prose-lien mt-2 text-doux" set:html={item.text} />
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- Fonctionnalités -->
+    <section class="mx-auto max-w-5xl px-5 py-20" aria-labelledby="fonctions">
+      <h2 id="fonctions" class="text-3xl font-semibold tracking-tight sm:text-4xl">
+        {t.features.title}
+      </h2>
+      <ul class="mt-10 grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          t.features.items.map((item) => (
+            <li>
+              <h3 class="font-semibold">{item.title}</h3>
+              <p class="mt-2 text-doux" set:html={item.text} />
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <!-- Captures -->
+    <section class="border-y border-bord bg-surface" aria-labelledby="captures">
+      <div class="mx-auto max-w-5xl px-5 py-20">
+        <h2 id="captures" class="text-3xl font-semibold tracking-tight sm:text-4xl">
+          {t.shots.title}
+        </h2>
+        <div class="mt-10 grid items-start gap-10 lg:grid-cols-2">
+          <div class="grid gap-8">
+            {
+              pastilles.map((p) => (
+                <figure>
+                  <Picture
+                    src={p.src}
+                    alt={p.alt}
+                    formats={['avif', 'webp']}
+                    widths={[p.src.width / 2, p.src.width]}
+                    sizes="(min-width: 64rem) 30rem, calc(100vw - 2.5rem)"
+                    class="h-auto w-full rounded-xl border border-bord"
+                  />
+                  <figcaption class="mt-3 text-sm text-doux">{p.caption}</figcaption>
+                </figure>
+              ))
+            }
+          </div>
+          <figure>
+            <Picture
+              src={reglages}
+              alt={t.shots.items.reglages.alt}
+              formats={['avif', 'webp']}
+              widths={[350, 700]}
+              sizes="(min-width: 64rem) 30rem, calc(100vw - 2.5rem)"
+              class="h-auto w-full rounded-xl"
+            />
+            <figcaption class="mt-3 text-sm text-doux">{t.shots.items.reglages.caption}</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- Installation -->
+    <section
+      id="installation"
+      class="mx-auto max-w-5xl scroll-mt-4 px-5 py-20"
+      aria-labelledby="installer"
+    >
+      <h2 id="installer" class="text-3xl font-semibold tracking-tight sm:text-4xl">
+        {t.install.title}
+      </h2>
+      <div class="mt-10 grid gap-10 lg:grid-cols-2">
+        <div class="min-w-0">
+          <h3 class="font-semibold">{t.install.prereqTitle}</h3>
+          <ul class="prose-lien mt-3 list-disc space-y-1.5 pl-5 text-doux">
+            {t.install.prereqs.map((p) => <li set:html={p} />)}
+          </ul>
+          <h3 class="mt-8 font-semibold">{t.install.commandsTitle}</h3>
+          <pre
+            class="mt-3 overflow-x-auto rounded-xl bg-[#1c1c1e] p-4 text-sm leading-relaxed text-[#f2f1ef]"
+            tabindex="0"><code>{commandes}</code></pre>
+          <p class="mt-4 text-doux" set:html={t.install.after} />
+        </div>
+        <div class="min-w-0">
+          <h3 class="font-semibold">{t.install.permissionsTitle}</h3>
+          <ol class="mt-3 space-y-4">
+            {
+              t.install.permissions.map((p, i) => (
+                <li class="flex gap-4 rounded-xl border border-bord bg-surface p-4">
+                  <span
+                    class="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-sur-accent"
+                    aria-hidden="true"
+                  >
+                    {i + 1}
+                  </span>
+                  <div>
+                    <p class="font-medium">{p.title}</p>
+                    <p class="mt-1 text-doux" set:html={p.text} />
+                  </div>
+                </li>
+              ))
+            }
+          </ol>
+          <p class="mt-6 text-lg font-medium" set:html={t.install.ready} />
+          <p class="mt-3 text-doux" set:html={t.install.update} />
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="border-t border-bord bg-surface" aria-labelledby="faq">
+      <div class="mx-auto max-w-3xl px-5 py-20">
+        <h2 id="faq" class="text-3xl font-semibold tracking-tight sm:text-4xl">{t.faq.title}</h2>
+        <div class="mt-8 divide-y divide-bord border-y border-bord">
+          {
+            t.faq.items.map((item) => (
+              <details class="group py-4">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-medium [&::-webkit-details-marker]:hidden">
+                  {item.q}
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 16 16"
+                    class="size-4 shrink-0 text-doux transition-transform group-open:rotate-45"
+                  >
+                    <path
+                      d="M8 3v10M3 8h10"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </summary>
+                <p class="prose-lien mt-3 text-doux" set:html={item.a} />
+              </details>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-bord">
+    <div
+      class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-5 py-8 text-sm text-doux"
+    >
+      <p>
+        Murmure ·{' '}
+        <a href={`${depot}/blob/main/LICENSE`} class="underline underline-offset-2 hover:text-texte">
+          {t.footer.license}
+        </a>{' '}
+        · {t.footer.by} {t.footer.author}
+      </p>
+      <a href={depot} class="underline underline-offset-2 hover:text-texte">{t.footer.source}</a>
+    </div>
+  </footer>
+</Base>
