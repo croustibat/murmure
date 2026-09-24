@@ -60,6 +60,13 @@ Pour que le texte se colle tout seul, ajoutez ensuite `Murmure.app` dans
 **Réglages > Confidentialité et sécurité > Accessibilité**. Sans cela le texte
 arrive dans le presse-papiers et vous faites ⌘V vous-même.
 
+Murmure vérifie ces autorisations elle-même. Tant que l'Accessibilité manque (ou que
+le micro est refusé), l'icône de la barre des menus porte un point d'exclamation et
+le menu commence par « ⚠︎ Collage automatique désactivé — Autoriser… », qui ouvre
+le bon panneau des Réglages ; au premier lancement concerné, une alerte explique la
+marche à suivre. L'alerte du menu disparaît d'elle-même dès l'autorisation accordée.
+Si le collage reste refusé malgré tout, le menu propose « Relancer Murmure ».
+
 En venant d'une version où `Murmure.app` n'était qu'un lanceur (déclenché par
 Karabiner), macOS redemande ces deux autorisations **une fois** : l'app est nouvelle
 à ses yeux.
@@ -300,12 +307,14 @@ d'environ 1 Mo, le journal est renommé `murmure.log.1` et repart de zéro.
 | Symptôme | Cause probable |
 |---|---|
 | « Aucun son capté » | autorisation micro refusée, ou mauvais `MURMURE_DEVICE` |
-| Texte copié mais pas collé | `Murmure.app` absent de la liste Accessibilité |
+| Texte copié mais pas collé, notification « Autorise Murmure dans Réglages > Accessibilité » | autorisation Accessibilité absente ou périmée (`n'est pas autorisé à envoyer de saisies. (1002)` dans le journal) : dans la liste Accessibilité, supprimez l'entrée Murmure (–), même cochée, puis rajoutez-la (+) |
+| Texte copié mais pas collé, sans cette notification | l'app cible n'a pas repris le premier plan, ou a été quittée : le journal le dit |
 | Accents cassés (`Soci√©t√©`) | locale non UTF-8 dans l'environnement du raccourci |
 | Première dictée très lente | chargement du modèle et des shaders Metal ; les suivantes sont rapides |
 | ⌘⇧E démarre puis arrête aussitôt, ou lance autre chose | une règle Karabiner encore active : `./install.sh` la signale, retirez-la dans Complex Modifications |
 | ⌘⇧E ne fait rien | Murmure n'est pas ouverte (icône absente) ou le raccourci est pris : le menu et le journal l'indiquent |
-| Autorisations à redonner après une mise à jour | `Murmure.app` a changé (l'installeur l'indique) : macOS voit une nouvelle signature |
+| Autorisations à redonner après une mise à jour | `Murmure.app` a changé (l'installeur l'indique) : macOS voit une nouvelle signature, l'ancienne entrée Accessibilité reste cochée mais ne vaut plus. Supprimez-la (–) puis rajoutez-la |
+| « ⚠︎ Collage refusé par macOS — Relancer Murmure » dans le menu | l'autorisation est accordée mais pas encore prise en compte : choisissez cette entrée |
 | Erreur de modèle au lancement de Whisper | fichier abîmé : `./install.sh --verify` |
 
 ## Désinstallation

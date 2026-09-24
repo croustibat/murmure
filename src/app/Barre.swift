@@ -16,6 +16,7 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let demarrage = NSMenuItem(title: "Ouvrir au démarrage", action: #selector(changerDemarrage), keyEquivalent: "")
     private let historique = Historique()
     private let misesAJour = MisesAJour()
+    private let autorisations = Autorisations()
     private var raccourcis: Raccourcis!
     private var etat: Etat?
     private var enfonce = false   // touche du raccourci actuellement enfoncée
@@ -32,6 +33,8 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         lireEtat()
         journal("Murmure \(versionMurmure) prête (\(murmureHome))")
         misesAJour.demarrer()
+        autorisations.changement = { [weak self] in self?.dessinerIcone() }
+        autorisations.demarrer()
     }
 
     private func construireMenu() {
@@ -48,7 +51,8 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         versionItem.isEnabled = false
         let quitter = NSMenuItem(title: "Quitter Murmure", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
-        for i in [ligneEtat, ligneRaccourci, bascule, .separator(), dernieres, .separator(),
+        for i in [autorisations.accessibilite, autorisations.micro, autorisations.relancer, autorisations.separateur,
+                  ligneEtat, ligneRaccourci, bascule, .separator(), dernieres, .separator(),
                   reglages, demarrage, journalItem, .separator(), misesAJour.disponible, versionItem, misesAJour.rechercher, quitter] {
             menu.addItem(i)
         }
@@ -118,6 +122,7 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
             releve = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in self?.lireEtat() }
         }
         guard nouvel != etat else { return }
+        if nouvel == .pret && etat != nil { autorisations.verifier() }   // collage refusé ?
         etat = nouvel
 
         // Échap n'est intercepté que pendant l'écoute : le reste du temps, il
@@ -128,16 +133,26 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
             raccourcis.retirer(Barre.idEchap)
         }
 
-        let symbole: String
         switch nouvel {
         case .pret:
-            ligneEtat.title = "Prêt"; bascule.title = "Démarrer la dictée"; symbole = "waveform"
+            ligneEtat.title = "Prêt"; bascule.title = "Démarrer la dictée"
         case .ecoute:
-            ligneEtat.title = "Écoute…"; bascule.title = "Arrêter et transcrire"; symbole = "waveform.circle.fill"
+            ligneEtat.title = "Écoute…"; bascule.title = "Arrêter et transcrire"
         case .transcription:
-            ligneEtat.title = "Transcription…"; bascule.title = "Démarrer la dictée"; symbole = "ellipsis.circle"
+            ligneEtat.title = "Transcription…"; bascule.title = "Démarrer la dictée"
         }
         bascule.isEnabled = nouvel != .transcription
+        dessinerIcone()
+    }
+
+    // Au repos, une autorisation manquante marque l'onde d'un point d'exclamation.
+    private func dessinerIcone() {
+        let symbole: String
+        switch etat ?? .pret {
+        case .pret: symbole = autorisations.manque ? "waveform.badge.exclamationmark" : "waveform"
+        case .ecoute: symbole = "waveform.circle.fill"
+        case .transcription: symbole = "ellipsis.circle"
+        }
         let image = NSImage(systemSymbolName: symbole, accessibilityDescription: "Murmure — \(ligneEtat.title)")
         image?.isTemplate = true
         item.button?.image = image
@@ -145,6 +160,7 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         demarrage.state = Demarrage.actif ? .on : .off
+        autorisations.verifier()
         lireEtat()
     }
 
