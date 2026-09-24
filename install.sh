@@ -3,7 +3,9 @@
 set -euo pipefail
 
 MURMURE_HOME="${MURMURE_HOME:-$HOME/.local/share/murmure}"
-APP_DIR="${MURMURE_APP_DIR:-$HOME/Applications}"
+APP_DIR="${MURMURE_APP_DIR:-/Applications}"
+# Emplacement des versions ≤ 1.1.0, retiré lors d'une installation par défaut.
+OLD_APP="$HOME/Applications/Murmure.app"
 APP="$APP_DIR/Murmure.app"
 KARABINER_DIR="${MURMURE_KARABINER_DIR:-$HOME/.config/karabiner}"
 MODEL_NAME="${MURMURE_MODEL_NAME:-ggml-large-v3-turbo-q5_0.bin}"
@@ -189,6 +191,14 @@ else
     note "Murmure.app : créée"
   fi
   pkill -f "$APP/Contents/MacOS/Murmure" 2>/dev/null || true   # ancienne version
+  # Migration : l'app vivait dans ~/Applications. Seulement pour une
+  # installation par défaut — jamais quand MURMURE_APP_DIR vise un autre dossier.
+  if [ -z "${MURMURE_APP_DIR:-}" ] && [ "$OLD_APP" != "$APP" ] && [ -d "$OLD_APP" ]; then
+    "$OLD_APP/Contents/MacOS/Murmure" --demarrage non >/dev/null 2>&1 || true
+    pkill -f "$OLD_APP/Contents/MacOS/Murmure" 2>/dev/null || true
+    rm -rf "$OLD_APP"
+    note "ancienne copie $OLD_APP : retirée (Murmure est maintenant dans $APP_DIR)"
+  fi
   mkdir -p "$APP_DIR"
   rm -rf "$APP"
   mkdir -p "$APP/Contents/MacOS"

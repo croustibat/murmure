@@ -2,13 +2,16 @@
 # Murmure — désinstallation.
 set -euo pipefail
 MURMURE_HOME="${MURMURE_HOME:-$HOME/.local/share/murmure}"
-APP="${MURMURE_APP_DIR:-$HOME/Applications}/Murmure.app"
+APP="${MURMURE_APP_DIR:-/Applications}/Murmure.app"
+# Emplacement des versions ≤ 1.1.0, retiré aussi lors d'une désinstallation par défaut.
+OLD_APP=""; [ -z "${MURMURE_APP_DIR:-}" ] && [ -d "$HOME/Applications/Murmure.app" ] && OLD_APP="$HOME/Applications/Murmure.app"
 STATE_DIR="${MURMURE_STATE_DIR:-/tmp/murmure-$(id -u)}"
 KB="${MURMURE_KARABINER_DIR:-$HOME/.config/karabiner}/assets/complex_modifications/murmure.json"
 AGENT="${MURMURE_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}/dev.croustibat.murmure.plist"
 
 echo "Cette opération supprime :"
 echo "  $APP"
+[ -n "$OLD_APP" ] && echo "  $OLD_APP"
 echo "  $MURMURE_HOME (dont le modèle Whisper et un éventuel téléchargement .part)"
 [ -f "$KB" ] && echo "  $KB"
 [ -f "$AGENT" ] && echo "  $AGENT"
@@ -22,6 +25,7 @@ case "$a" in [oO]*) ;; *) echo "Annulé."; exit 0 ;; esac
 pkill -f "$APP/Contents/MacOS/Murmure" 2>/dev/null || true
 pkill -f "$MURMURE_HOME/overlay" 2>/dev/null || true
 rm -rf "$APP" "$MURMURE_HOME" "$STATE_DIR"
+[ -n "$OLD_APP" ] && { pkill -f "$OLD_APP/Contents/MacOS/Murmure" 2>/dev/null || true; rm -rf "$OLD_APP"; }
 [ -f "$KB" ] && rm -f "$KB"
 [ -f "$AGENT" ] && rm -f "$AGENT"
 echo "Murmure a été supprimé."

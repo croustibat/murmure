@@ -41,7 +41,7 @@ cd murmure
 ```
 
 L'installeur pose `ffmpeg` et `whisper-cpp`, télécharge le modèle (~550 Mo, une fois),
-compile la pastille et l'app `~/Applications/Murmure.app`, puis la lance : son icône
+compile la pastille et l'app `/Applications/Murmure.app`, puis la lance : son icône
 apparaît dans la barre des menus.
 
 Le menu signale une nouvelle version (« Version X.Y.Z disponible », qui ouvre la page
@@ -98,7 +98,7 @@ arrêterait aussitôt la dictée. `./install.sh` signale une telle règle encore
 Raycast, Karabiner ou tout autre outil peuvent toujours piloter Murmure :
 
 ```
-/usr/bin/open -n -a ~/Applications/Murmure.app --args toggle
+/usr/bin/open -n -a /Applications/Murmure.app --args toggle
 ```
 
 L'option `-n` est indispensable : elle lance une instance éphémère qui exécute la
