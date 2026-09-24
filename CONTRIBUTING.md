@@ -64,7 +64,7 @@ seule instance tourne à la fois.
 mkdir -p /tmp/rel && echo '{"tag_name":"v9.9.9","html_url":"https://github.com/croustibat/murmure/releases"}' > /tmp/rel/latest
 (cd /tmp/rel && python3 -m http.server 8765) &
 rm -f ~/.local/share/murmure/.mises-a-jour   # oublie la vérification du jour
-MURMURE_RELEASES_URL=http://127.0.0.1:8765/latest ~/Applications/Murmure.app/Contents/MacOS/Murmure
+MURMURE_RELEASES_URL=http://127.0.0.1:8765/latest /Applications/Murmure.app/Contents/MacOS/Murmure
 ```
 
 `$MURMURE_HOME/.mises-a-jour` garde la date de la dernière requête et la version

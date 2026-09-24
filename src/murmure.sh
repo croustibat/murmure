@@ -88,7 +88,7 @@ HOLD_MS="${MURMURE_HOLD_MS:-600}" # au-delà, relâcher la touche arrête la cap
 OVERLAY="${MURMURE_OVERLAY:-$MURMURE_HOME/overlay}"
 HISTORIQUE="$MURMURE_HOME/historique.jsonl"   # dernières dictées, lues par le menu
 RESTORE_CLIPBOARD="${MURMURE_RESTORE_CLIPBOARD:-0}"
-APP_BIN="${MURMURE_APP:-$HOME/Applications/Murmure.app/Contents/MacOS/Murmure}"
+APP_BIN="${MURMURE_APP:-/Applications/Murmure.app/Contents/MacOS/Murmure}"
 CLIP_SAVE="$STATE_DIR/presse-papiers"   # contenu d'origine, le temps du collage
 REFUSED="$STATE_DIR/collage-refuse"   # ⌘V refusé par macOS : l'app propose une relance
 mkdir -p "$STATE_DIR"
