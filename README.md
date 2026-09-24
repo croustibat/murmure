@@ -331,6 +331,9 @@ fichiers de `~/.local/share/murmure`.
 La publication d'une version (fichier `VERSION`, étiquette, GitHub Release) est décrite
 dans [CONTRIBUTING.md](CONTRIBUTING.md).
 
+L'icône de l'app (`app/Murmure.icns`, versionnée) et ses déclinaisons pour le site
+(`site/public/`) se régénèrent avec `swift scripts/icone.swift`, sans autre outil.
+
 ## Licence
 
 MIT — voir [LICENSE](LICENSE).
