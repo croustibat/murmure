@@ -183,7 +183,8 @@ else
   swiftc -O -parse-as-library -o "$STAGE/Murmure" "$SRC"/src/app/*.swift \
     || fail "compilation de Murmure.app impossible"
   if [ -d "$APP" ]; then
-    note "Murmure.app : recréée — autorisations Micro et Accessibilité à redonner"
+    note "Murmure.app : recréée — autorisation Accessibilité à supprimer puis rajouter (voir plus bas)"
+    RECREATED=1
   else
     note "Murmure.app : créée"
   fi
@@ -273,10 +274,35 @@ fi
 step "Lancement de Murmure"
 pkill -f "$APP/Contents/MacOS/Murmure" 2>/dev/null || true
 for _ in $(seq 1 20); do pgrep -f "$APP/Contents/MacOS/Murmure" >/dev/null || break; sleep 0.1; done
-if open ${MURMURE_STATE_DIR:+--env "MURMURE_STATE_DIR=$MURMURE_STATE_DIR"} "$APP"; then
+# Variables de test transmises à l'app (dossier d'état, autorisations sans invite).
+if open ${MURMURE_STATE_DIR:+--env "MURMURE_STATE_DIR=$MURMURE_STATE_DIR"} \
+        ${MURMURE_AX_NO_PROMPT:+--env "MURMURE_AX_NO_PROMPT=$MURMURE_AX_NO_PROMPT"} "$APP"; then
   ok "Murmure est dans la barre des menus"
 else
   warn "lancement impossible — ouvrez $APP"
+fi
+
+# Nouvelle signature : l'ancienne entrée Accessibilité reste affichée cochée
+# mais ne vaut plus, et la recocher ne suffit pas.
+if [ "${RECREATED:-0}" = 1 ]; then
+  PERMISSIONS="\
+Murmure.app a été recréée : macOS ne reconnaît plus ses autorisations.
+
+  1. ${bold}Accessibilité${off} — Réglages > Confidentialité et sécurité > Accessibilité :
+     l'entrée Murmure reste cochée mais ne vaut plus. Sélectionnez-la,
+     ${bold}supprimez-la (–)${off}, puis rajoutez-la (+, ⌘⇧G et coller : $APP)
+     et cochez-la.
+  2. ${bold}Micro${off} — si macOS le redemande à la première dictée : Autoriser.
+
+Tant que l'Accessibilité manque, le menu de Murmure le signale en tête."
+else
+  PERMISSIONS="\
+Il reste deux autorisations à accorder, au ${bold}premier usage${off} :
+
+  1. ${bold}Micro${off} — un dialogue « Murmure » apparaîtra : Autoriser.
+  2. ${bold}Accessibilité${off} — pour que le texte se colle tout seul.
+     Réglages > Confidentialité et sécurité > Accessibilité > +
+     puis ⌘⇧G et coller : $APP"
 fi
 
 cat <<FIN
@@ -285,14 +311,9 @@ ${bold}Installation terminée.${off}
 
 $(printf '  - %s\n' "${CHANGES[@]}")
 
-Il reste deux autorisations à accorder, au ${bold}premier usage${off} :
+$PERMISSIONS
 
-  1. ${bold}Micro${off} — un dialogue « Murmure » apparaîtra : Autoriser.
-  2. ${bold}Accessibilité${off} — pour que le texte se colle tout seul.
-     Réglages > Confidentialité et sécurité > Accessibilité > +
-     puis ⌘⇧G et coller : $APP
-
-Sans la seconde, le texte va dans le presse-papiers et vous faites ⌘V.
+Sans l'Accessibilité, le texte va dans le presse-papiers et vous faites ⌘V.
 
 Essai : $SHORTCUT, parlez, puis à nouveau — ou gardez la combinaison
 enfoncée le temps de parler. Échap pendant l'écoute annule.

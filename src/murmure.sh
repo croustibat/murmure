@@ -90,6 +90,7 @@ HISTORIQUE="$MURMURE_HOME/historique.jsonl"   # dernières dictées, lues par le
 RESTORE_CLIPBOARD="${MURMURE_RESTORE_CLIPBOARD:-0}"
 APP_BIN="${MURMURE_APP:-$HOME/Applications/Murmure.app/Contents/MacOS/Murmure}"
 CLIP_SAVE="$STATE_DIR/presse-papiers"   # contenu d'origine, le temps du collage
+REFUSED="$STATE_DIR/collage-refuse"   # ⌘V refusé par macOS : l'app propose une relance
 mkdir -p "$STATE_DIR"
 
 # Calculs décimaux en locale C : en fr_FR, awk écrirait « 5,36 ».
@@ -137,7 +138,9 @@ remember_target() {
 }
 
 # Réactive l'app cible si on en a changé pendant la transcription, puis ⌘V.
-# Échoue sans coller si la cible ne revient pas au premier plan.
+# Échoue sans coller si la cible ne revient pas au premier plan (code 1), ou
+# avec le code 2 si macOS refuse la frappe faute d'autorisation Accessibilité
+# (« n'est pas autorisé à envoyer de saisies (1002) », ou -1719 / -25211).
 paste_into() {
   local pid=$1 bundle=$2 front
   front=$(front_app); front=${front%% *}
@@ -150,8 +153,19 @@ paste_into() {
     done
     [ "${front%% *}" = "$pid" ] || { log "cible non réactivée"; return 1; }
   fi
-  osascript -e 'tell application "System Events" to keystroke "v" using command down' \
-    >>"$LOG" 2>&1
+  local out
+  if out=$(osascript -e 'tell application "System Events" to keystroke "v" using command down' 2>&1); then
+    rm -f "$REFUSED"
+    return 0
+  fi
+  printf '%s\n' "$out" >>"$LOG"
+  case "$out" in
+    *'(1002)'*|*'(-1719)'*|*'(-25211)'*)
+      log "collage refusé : autorisation Accessibilité absente"
+      touch "$REFUSED"
+      return 2 ;;
+  esac
+  return 1
 }
 
 # MURMURE_DEVICE accepte un index avfoundation (« :0 ») ou un nom de micro,
@@ -357,6 +371,9 @@ stop_and_transcribe() {
     notify "Texte copié — Cmd+V pour coller"
   elif paste_into "$pid" "$bundle"; then
     restore_clipboard
+  elif [ $? = 2 ]; then
+    rm -f "$CLIP_SAVE"
+    notify "Autorise Murmure dans Réglages > Accessibilité — texte copié, ⌘V pour coller"
   else
     rm -f "$CLIP_SAVE"
     notify "Texte copié — Cmd+V pour coller"
