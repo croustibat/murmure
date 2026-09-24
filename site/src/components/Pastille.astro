@@ -1,0 +1,212 @@
+---
+// Reproduction en CSS de la pastille de l'app (src/overlay.swift) : onde
+// pendant l'écoute, puis points allumés un à un pendant la transcription.
+// Mêmes proportions que l'original (44 px de haut, 8 barres de 3 px), mises à
+// l'échelle par --k. Aucun JavaScript : tout tient dans une boucle d'animation.
+interface Props {
+  label: string;
+  ecoute: string;
+  transcription: string;
+}
+const { label, ecoute, transcription } = Astro.props;
+
+// Bombement de l'onde, comme dans overlay.swift : 0,55 + 0,45·sin(π(i+½)/8).
+const barres = Array.from({ length: 8 }, (_, i) => ({
+  i,
+  bombe: (0.55 + 0.45 * Math.sin((Math.PI * (i + 0.5)) / 8)).toFixed(3),
+  // Durées et décalages différents : l'onde ne bat jamais au pas.
+  duree: [0.62, 0.48, 0.7, 0.55, 0.66, 0.5, 0.72, 0.58][i],
+}));
+---
+
+<div class="pastille" role="img" aria-label={label}>
+  <span class="onde" aria-hidden="true">
+    {
+      barres.map((b) => (
+        <span
+          class="barre"
+          style={`--i:${b.i};--b:${b.bombe};--d:${b.duree}s;--r:${-b.i * 0.17}s`}
+        />
+      ))
+    }
+  </span>
+  <span class="libelles" aria-hidden="true">
+    <span class="libelle ecoute">{ecoute}</span>
+    <span class="libelle transcription">{transcription}</span>
+  </span>
+  <span class="separateur" aria-hidden="true"></span>
+  <span class="stop" aria-hidden="true"></span>
+  <span class="croix" aria-hidden="true"></span>
+</div>
+
+<style>
+  @property --ecoute {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 1;
+  }
+  @property --progres {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 0;
+  }
+  @property --vague {
+    syntax: '<number>';
+    inherits: false;
+    initial-value: 0.6;
+  }
+
+  .pastille {
+    --k: 1.35;
+    --px: calc(var(--k) * 1px);
+    display: inline-flex;
+    align-items: center;
+    height: calc(44 * var(--px));
+    padding-inline: calc(18 * var(--px)) calc(16 * var(--px));
+    border-radius: 999px;
+    background: rgb(28 28 28 / 0.96);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.1),
+      0 calc(4 * var(--px)) calc(18 * var(--px)) rgb(0 0 0 / 0.3);
+    color: rgb(255 255 255 / 0.95);
+    font:
+      500 calc(13 * var(--px)) / 1 -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
+    animation: cycle 9s linear infinite;
+  }
+  @media (min-width: 40rem) {
+    .pastille {
+      --k: 1.6;
+    }
+  }
+
+  .onde {
+    display: flex;
+    align-items: center;
+    gap: calc(3.5 * var(--px));
+    height: calc(16 * var(--px));
+  }
+  /* Écoute : hauteur portée par la « voix » (--vague), bombée au centre.
+     Transcription : points de 5 px, allumés à mesure que --progres avance. */
+  .barre {
+    width: calc(3 * var(--px));
+    height: calc(
+      (3 + 13 * (var(--ecoute) * var(--b) * var(--vague) + (1 - var(--ecoute)) * 0.18)) *
+        var(--px)
+    );
+    border-radius: 999px;
+    background: #fff;
+    opacity: calc(
+      var(--ecoute) * 0.92 +
+        (1 - var(--ecoute)) * (0.25 + 0.72 * clamp(0, var(--progres) * 8 - var(--i), 1))
+    );
+    animation: vague var(--d) ease-in-out var(--r) infinite alternate;
+  }
+
+  .libelles {
+    display: grid;
+    margin-inline: calc(10 * var(--px)) calc(14 * var(--px));
+    white-space: nowrap;
+  }
+  .libelle {
+    grid-area: 1 / 1;
+  }
+  .ecoute {
+    opacity: var(--ecoute);
+  }
+  .transcription {
+    opacity: calc(1 - var(--ecoute));
+  }
+
+  .separateur {
+    width: 1px;
+    height: calc(18 * var(--px));
+    background: rgb(255 255 255 / 0.18);
+  }
+  .stop {
+    width: calc(11 * var(--px));
+    height: calc(11 * var(--px));
+    margin-inline: calc(14 * var(--px));
+    border-radius: calc(2.5 * var(--px));
+    background: #fff;
+    opacity: calc(0.35 + 0.57 * var(--ecoute));
+  }
+  .croix {
+    position: relative;
+    width: calc(9 * var(--px));
+    height: calc(9 * var(--px));
+    opacity: calc(0.2 + 0.4 * var(--ecoute));
+  }
+  .croix::before,
+  .croix::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: calc(12.7 * var(--px));
+    height: calc(1.8 * var(--px));
+    border-radius: 999px;
+    background: #fff;
+    translate: -50% -50%;
+    rotate: 45deg;
+  }
+  .croix::after {
+    rotate: -45deg;
+  }
+
+  /* 0-55 % écoute, puis transcription : la jauge avance vite, ralentit
+     avant la fin, et la pastille disparaît une fois le texte collé. */
+  @keyframes cycle {
+    0% {
+      --ecoute: 1;
+      --progres: 0;
+      opacity: 0;
+      translate: 0 6px;
+    }
+    4% {
+      opacity: 1;
+      translate: 0 0;
+    }
+    54% {
+      --ecoute: 1;
+      --progres: 0;
+    }
+    57% {
+      --ecoute: 0;
+      --progres: 0;
+      animation-timing-function: cubic-bezier(0.3, 0.6, 0.5, 1);
+    }
+    90% {
+      --progres: 1;
+    }
+    95% {
+      --ecoute: 0;
+      opacity: 1;
+      translate: 0 0;
+    }
+    100% {
+      --ecoute: 0;
+      --progres: 1;
+      opacity: 0;
+      translate: 0 6px;
+    }
+  }
+  @keyframes vague {
+    from {
+      --vague: 0.2;
+    }
+    to {
+      --vague: 1;
+    }
+  }
+
+  /* Sans animation : la pastille reste figée en écoute. */
+  @media (prefers-reduced-motion: reduce) {
+    .pastille,
+    .barre {
+      animation: none;
+    }
+  }
+</style>

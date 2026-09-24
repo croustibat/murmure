@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+
+/* Couleurs suivant le thème du système : les variables changent en sombre,
+   les utilitaires Tailwind (bg-fond, text-texte…) restent les mêmes. */
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --color-fond: var(--fond);
+  --color-surface: var(--surface);
+  --color-bord: var(--bord);
+  --color-texte: var(--texte);
+  --color-doux: var(--doux);
+  --color-accent: var(--accent);
+  --color-accent-fort: var(--accent-fort);
+  --color-sur-accent: var(--sur-accent);
+}
+
+:root {
+  color-scheme: light dark;
+  --fond: #faf9f7;
+  --surface: #ffffff;
+  --bord: #e4e1dc;
+  --texte: #1c1b1a;
+  --doux: #57534e;
+  --accent: #4338ca;
+  --accent-fort: #3730a3;
+  --sur-accent: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fond: #121212;
+    --surface: #1c1c1e;
+    --bord: #33322f;
+    --texte: #f2f1ef;
+    --doux: #b5b1ab;
+    --accent: #a5b4fc;
+    --accent-fort: #c7d2fe;
+    --sur-accent: #1e1b4b;
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+  body {
+    @apply bg-fond text-texte font-sans antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+  code,
+  kbd {
+    @apply font-mono text-[0.9em];
+  }
+  :not(pre) > code,
+  kbd {
+    @apply rounded-md border border-bord bg-surface px-1.5 py-0.5;
+  }
+  kbd {
+    @apply font-sans font-medium whitespace-nowrap;
+  }
+}
+
+/* Texte issu des traductions (liens et code inclus). */
+@utility prose-lien {
+  & a {
+    @apply text-accent underline decoration-1 underline-offset-2 hover:text-accent-fort;
+  }
+}

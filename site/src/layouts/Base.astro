@@ -1,0 +1,64 @@
+---
+import '../styles/global.css';
+import { codes, type Langue, type Textes } from '../i18n';
+
+interface Props {
+  langue: Langue;
+  t: Textes;
+}
+const { langue, t } = Astro.props;
+
+const chemins: Record<Langue, string> = { fr: '/', en: '/en/' };
+const absolue = (chemin: string) => new URL(chemin, Astro.site).href;
+const image = absolue(langue === 'fr' ? '/og.png' : '/og-en.png');
+---
+
+<!doctype html>
+<html lang={codes[langue].html}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{t.meta.title}</title>
+    <meta name="description" content={t.meta.description} />
+    <link rel="canonical" href={absolue(chemins[langue])} />
+    {
+      (Object.keys(chemins) as Langue[]).map((l) => (
+        <link rel="alternate" hreflang={codes[l].html} href={absolue(chemins[l])} />
+      ))
+    }
+    <link rel="alternate" hreflang="x-default" href={absolue(chemins.fr)} />
+
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/icone-512.png" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Murmure" />
+    <meta property="og:title" content={t.meta.title} />
+    <meta property="og:description" content={t.meta.description} />
+    <meta property="og:url" content={absolue(chemins[langue])} />
+    <meta property="og:locale" content={codes[langue].og} />
+    <meta property="og:locale:alternate" content={codes[langue === 'fr' ? 'en' : 'fr'].og} />
+    <meta property="og:image" content={image} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={t.meta.ogAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={t.meta.title} />
+    <meta name="twitter:description" content={t.meta.description} />
+    <meta name="twitter:image" content={image} />
+    <meta name="twitter:image:alt" content={t.meta.ogAlt} />
+  </head>
+  <body>
+    <a
+      href="#contenu"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:shadow"
+    >
+      {t.nav.skip}
+    </a>
+    <slot />
+  </body>
+</html>
