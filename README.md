@@ -60,6 +60,15 @@ Pour que le texte se colle tout seul, ajoutez ensuite `Murmure.app` dans
 **Réglages > Confidentialité et sécurité > Accessibilité**. Sans cela le texte
 arrive dans le presse-papiers et vous faites ⌘V vous-même.
 
+macOS rattache ces autorisations à la signature de l'app. Si le trousseau contient
+un certificat de développeur Apple (« Developer ID Application », sinon « Apple
+Development »), `install.sh` signe `Murmure.app` avec : macOS la reconnaît alors à
+son identifiant et à votre équipe, et les autorisations survivent aux mises à jour.
+Sans certificat, l'app est signée ad hoc, reconnue à l'empreinte de son binaire :
+chaque recompilation oblige à redonner l'Accessibilité (voir Dépannage).
+`MURMURE_SIGN_IDENTITY` choisit un certificat (nom, équipe ou empreinte SHA-1) ;
+`MURMURE_SIGN_IDENTITY=-` force la signature ad hoc.
+
 Murmure vérifie ces autorisations elle-même. Tant que l'Accessibilité manque (ou que
 le micro est refusé), l'icône de la barre des menus porte un point d'exclamation et
 le menu commence par « ⚠︎ Collage automatique désactivé — Autoriser… », qui ouvre
@@ -313,7 +322,7 @@ d'environ 1 Mo, le journal est renommé `murmure.log.1` et repart de zéro.
 | Première dictée très lente | chargement du modèle et des shaders Metal ; les suivantes sont rapides |
 | ⌘⇧E démarre puis arrête aussitôt, ou lance autre chose | une règle Karabiner encore active : `./install.sh` la signale, retirez-la dans Complex Modifications |
 | ⌘⇧E ne fait rien | Murmure n'est pas ouverte (icône absente) ou le raccourci est pris : le menu et le journal l'indiquent |
-| Autorisations à redonner après une mise à jour | `Murmure.app` a changé (l'installeur l'indique) : macOS voit une nouvelle signature, l'ancienne entrée Accessibilité reste cochée mais ne vaut plus. Supprimez-la (–) puis rajoutez-la |
+| Autorisations à redonner après une mise à jour | l'identité de `Murmure.app` a changé (l'installeur l'indique) : signature ad hoc recompilée, ou passage à un certificat. L'ancienne entrée Accessibilité reste cochée mais ne vaut plus : supprimez-la (–) puis rajoutez-la. Avec un certificat, cela n'arrive qu'une fois |
 | « ⚠︎ Collage refusé par macOS — Relancer Murmure » dans le menu | l'autorisation est accordée mais pas encore prise en compte : choisissez cette entrée |
 | Erreur de modèle au lancement de Whisper | fichier abîmé : `./install.sh --verify` |
 
