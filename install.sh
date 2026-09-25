@@ -161,7 +161,7 @@ fi
 # Le bundle .app est indispensable : un script nu n'a pas d'identité TCC, macOS ne
 # propose jamais l'autorisation micro et livre un flux muet à la place.
 # Les autorisations Micro et Accessibilité suivent la signature : on ne recrée ni
-# ne re-signe le bundle que si son contenu change. swiftc ne produisant pas deux
+# ne re-signe le bundle que si son contenu ou l'identité de signature change. swiftc ne produisant pas deux
 # fois le même binaire, Info.plist porte l'empreinte des sources de l'app, de son
 # icône et du compilateur : l'app n'est recompilée que si cette empreinte change.
 # Les mises à jour de murmure.sh ne la touchent pas.
@@ -175,22 +175,83 @@ plutil -replace CFBundleShortVersionString -string "$VERSION" "$STAGE/Info.plist
 plutil -replace CFBundleVersion -string "$VERSION" "$STAGE/Info.plist"
 plutil -replace MurmureHome -string "$MURMURE_HOME" "$STAGE/Info.plist"
 plutil -replace MurmureSourceSum -string "$APP_SUM" "$STAGE/Info.plist"
+
+# Identité de signature. Signée par un certificat, l'app est reconnue par macOS
+# à son identifiant et à son équipe : les autorisations survivent aux
+# recompilations. Signée ad hoc (sans certificat), elle l'est à l'empreinte de
+# son binaire : chaque recompilation fait perdre l'Accessibilité.
+# MURMURE_SIGN_IDENTITY choisit le certificat (nom ou empreinte SHA-1) ;
+# « - » force la signature ad hoc. Par défaut : Developer ID, puis Apple
+# Development, sinon ad hoc.
+IDENTITIES="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+identity_line() {  # motif → « empreinte nom » de la première identité valide
+  printf '%s\n' "$IDENTITIES" | grep -F -- "$1" \
+    | sed -n 's/^ *[0-9]*) \([0-9A-F]\{40\}\) "\(.*\)"$/\1 \2/p' | head -1 || true
+}
+if [ "${MURMURE_SIGN_IDENTITY:-}" = "-" ]; then
+  SIGN_LINE=""
+elif [ -n "${MURMURE_SIGN_IDENTITY:-}" ]; then
+  SIGN_LINE="$(identity_line "$MURMURE_SIGN_IDENTITY")"
+  [ -n "$SIGN_LINE" ] || fail "identité de signature introuvable : $MURMURE_SIGN_IDENTITY"
+else
+  SIGN_LINE="$(identity_line '"Developer ID Application: ')"
+  [ -n "$SIGN_LINE" ] || SIGN_LINE="$(identity_line '"Apple Development: ')"
+fi
+# Empreinte pour codesign (deux certificats peuvent porter le même nom), nom
+# pour comparer avec celui de l'app installée ; « - » : ad hoc.
+SIGN_HASH="${SIGN_LINE%% *}"; SIGN_NAME="${SIGN_LINE#* }"
+[ -n "$SIGN_LINE" ] || { SIGN_HASH="-"; SIGN_NAME="-"; }
+
+signer_of() {  # app → nom du certificat, ou « - » si ad hoc
+  local who
+  who="$(codesign -dvv "$1" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+  echo "${who:--}"
+}
+# Signe l'app ; un certificat inutilisable (trousseau verrouillé, en SSH par
+# exemple) laisse une signature ad hoc plutôt qu'une app non signée.
+sign_app() {
+  if [ "$SIGN_HASH" != "-" ] \
+     && codesign --force --sign "$SIGN_HASH" --timestamp=none "$APP" >/dev/null 2>&1; then
+    return
+  fi
+  if [ "$SIGN_HASH" != "-" ]; then
+    warn "signature avec « $SIGN_NAME » impossible — signature ad hoc"
+    SIGN_HASH="-"; SIGN_NAME="-"
+  fi
+  codesign --force --sign - "$APP" >/dev/null 2>&1 || warn "signature ad hoc impossible"
+}
+# Autorisations à redonner : l'identité de l'app a changé, ou elle est ad hoc
+# (nouveau binaire, nouvelle empreinte).
+PREV_SIGNER=""
+[ -d "$APP" ] && PREV_SIGNER="$(signer_of "$APP")"
+identity_changed() { [ -n "$PREV_SIGNER" ] && { [ "$SIGN_NAME" = "-" ] || [ "$PREV_SIGNER" != "$SIGN_NAME" ]; }; }
+signed_as() { if [ "$SIGN_NAME" = "-" ]; then echo "ad hoc"; else echo "$SIGN_NAME"; fi; }
+
 if [ -d "$APP" ] \
    && cmp -s "$STAGE/Info.plist" "$APP/Contents/Info.plist" \
    && [ -x "$APP/Contents/MacOS/Murmure" ] \
    && cmp -s "$SRC/app/Murmure.icns" "$APP/Contents/Resources/Murmure.icns" \
-   && codesign --verify "$APP" >/dev/null 2>&1; then
+   && codesign --verify "$APP" >/dev/null 2>&1 \
+   && [ "$PREV_SIGNER" = "$SIGN_NAME" ]; then
   ok "$APP inchangée — signature et autorisations conservées"
   note "Murmure.app : inchangée"
+elif [ -d "$APP" ] \
+   && cmp -s "$STAGE/Info.plist" "$APP/Contents/Info.plist" \
+   && [ -x "$APP/Contents/MacOS/Murmure" ] \
+   && cmp -s "$SRC/app/Murmure.icns" "$APP/Contents/Resources/Murmure.icns"; then
+  # Même contenu, autre identité : re-signer suffit.
+  pkill -f "$APP/Contents/MacOS/Murmure" 2>/dev/null || true
+  sign_app
+  if identity_changed; then
+    note "Murmure.app : re-signée ($(signed_as)) — autorisation Accessibilité à supprimer puis rajouter (voir plus bas)"
+    RECREATED=1
+  else
+    note "Murmure.app : re-signée ($(signed_as))"
+  fi
+  ok "$APP signée ($(signed_as))"
 else
   swiftc -O -parse-as-library -o "$STAGE/Murmure" "$SRC"/src/app/*.swift \
     || fail "compilation de Murmure.app impossible"
-  if [ -d "$APP" ]; then
-    note "Murmure.app : recréée — autorisation Accessibilité à supprimer puis rajouter (voir plus bas)"
-    RECREATED=1
-  else
-    note "Murmure.app : créée"
-  fi
   pkill -f "$APP/Contents/MacOS/Murmure" 2>/dev/null || true   # ancienne version
   # Migration : l'app vivait dans ~/Applications. Seulement pour une
   # installation par défaut — jamais quand MURMURE_APP_DIR vise un autre dossier.
@@ -207,8 +268,16 @@ else
   cp "$STAGE/Murmure" "$APP/Contents/MacOS/Murmure"
   cp "$SRC/app/Murmure.icns" "$APP/Contents/Resources/Murmure.icns"
   chmod +x "$APP/Contents/MacOS/Murmure"
-  codesign --force --sign - "$APP" >/dev/null 2>&1 || warn "signature ad-hoc impossible"
-  ok "$APP ($VERSION)"
+  sign_app
+  if [ -z "$PREV_SIGNER" ]; then
+    note "Murmure.app : créée ($(signed_as))"
+  elif identity_changed; then
+    note "Murmure.app : recréée ($(signed_as)) — autorisation Accessibilité à supprimer puis rajouter (voir plus bas)"
+    RECREATED=1
+  else
+    note "Murmure.app : recréée ($(signed_as)) — autorisations conservées"
+  fi
+  ok "$APP ($VERSION, $(signed_as))"
 fi
 
 # Règles actives de karabiner.json qui lancent Murmure (« murmure|profil|règle|
@@ -294,11 +363,20 @@ else
   warn "lancement impossible — ouvrez $APP"
 fi
 
-# Nouvelle signature : l'ancienne entrée Accessibilité reste affichée cochée
+# Nouvelle identité : l'ancienne entrée Accessibilité reste affichée cochée
 # mais ne vaut plus, et la recocher ne suffit pas.
+if [ "$SIGN_NAME" = "-" ]; then
+  SIGN_HINT="
+Signature ad hoc (aucun certificat de développeur) : chaque recompilation de
+Murmure.app obligera à refaire cette manipulation."
+else
+  SIGN_HINT="
+Murmure.app est désormais signée par « $SIGN_NAME » : les prochaines
+mises à jour conserveront les autorisations."
+fi
 if [ "${RECREATED:-0}" = 1 ]; then
   PERMISSIONS="\
-Murmure.app a été recréée : macOS ne reconnaît plus ses autorisations.
+Murmure.app a changé d'identité : macOS ne reconnaît plus ses autorisations.
 
   1. ${bold}Accessibilité${off} — Réglages > Confidentialité et sécurité > Accessibilité :
      l'entrée Murmure reste cochée mais ne vaut plus. Sélectionnez-la,
@@ -306,7 +384,8 @@ Murmure.app a été recréée : macOS ne reconnaît plus ses autorisations.
      et cochez-la.
   2. ${bold}Micro${off} — si macOS le redemande à la première dictée : Autoriser.
 
-Tant que l'Accessibilité manque, le menu de Murmure le signale en tête."
+Tant que l'Accessibilité manque, le menu de Murmure le signale en tête.
+$SIGN_HINT"
 else
   PERMISSIONS="\
 Il reste deux autorisations à accorder, au ${bold}premier usage${off} :

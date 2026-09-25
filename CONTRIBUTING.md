@@ -52,8 +52,9 @@ pré-version ne la déclenchent. La comparaison est numérique (`1.10.0` > `1.9.
 
        git pull && ./install.sh
 
-   L'installeur indique en fin d'installation si `Murmure.app` a changé : dans ce
-   cas, macOS redemande les autorisations Micro et Accessibilité.
+   L'installeur indique en fin d'installation si `Murmure.app` a changé
+   d'identité : dans ce cas, macOS redemande les autorisations Micro et
+   Accessibilité.
    ```
 
 La vérification se teste sans rien publier, avec un faux JSON servi en local
