@@ -323,15 +323,19 @@ stop_and_transcribe() {
 
   # Vocabulaire technique : sans ça, « Bash » devient « Bache », « commit » devient
   # « comité », etc. --carry-initial-prompt le réapplique à chaque fenêtre de 30 s.
+  # Il partage 224 tokens avec la fin de la fenêtre précédente : au-delà de
+  # ~150 tokens, une longue dictée perd le fil d'une fenêtre à l'autre.
   local -a prompt_args=()
   if [ -s "$PROMPT_FILE" ]; then
     prompt_args=(--prompt "$(tr -d '\n' <"$PROMPT_FILE")" --carry-initial-prompt)
   fi
 
+  # -sns écarte les étiquettes de bruit (« *sad* », « [Musique] ») que Whisper
+  # rend parfois à la place d'une vraie dictée ; OpenAI le fait par défaut.
   local text rc
   text=$("$WHISPER_BIN" -m "$MODEL" -f "$WAV" -l "$LANGUAGE" \
            ${prompt_args[@]+"${prompt_args[@]}"} ${WHISPER_ARGS[@]+"${WHISPER_ARGS[@]}"} \
-           --no-timestamps --no-prints 2>"$WHISPER_ERR")
+           -sns --no-timestamps --no-prints 2>"$WHISPER_ERR")
   rc=$?
   text=$(printf '%s' "$text" | tr '\n' ' ' | sed -e 's/  */ /g' -e 's/^ *//' -e 's/ *$//')
   # Les ~40 lignes Metal/ggml de chaque dictée ne vont au journal qu'en cas d'échec.

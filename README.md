@@ -171,6 +171,13 @@ Tout se règle dans `~/.local/share/murmure/` :
 | `vocabulaire.txt` | termes soufflés à Whisper avant la transcription |
 | `corrections.txt` | remplacements appliqués après, au format `entendu\|voulu` |
 
+Le vocabulaire est un court texte, pas une liste exhaustive : Whisper le relit
+avant chaque tranche de 30 s et il partage 224 tokens avec la fin de la tranche
+précédente. Au-delà d'environ 150 tokens (≈ 500 caractères), les longues dictées
+perdent le fil d'une tranche à l'autre. Mieux vaut y garder les noms propres et le
+jargon que Whisper écorche, et laisser les mots courants au dictionnaire de
+corrections.
+
 ### Le fichier `config`
 
 L'installeur le dépose avec toutes les clés en commentaire, à leur valeur par défaut,
