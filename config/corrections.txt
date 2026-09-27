@@ -33,3 +33,6 @@ artisane|artisan
 éloquente|Eloquent
 filament|Filament
 astro|Astro
+semvr|SemVer
+sem ver|SemVer
+automade|auto mode

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Banc d'essai des options de whisper-cli, avec les options réelles de Murmure
-# (prompt de vocabulaire, --carry-initial-prompt, -l fr).
+# (prompt de vocabulaire, --carry-initial-prompt, -sns, -l fr).
 #
 #   scripts/bench.sh [-n exécutions] [-c 'nom|options'] … audio.wav …
 #
@@ -88,7 +88,7 @@ for run in $(seq 1 "$RUNS"); do
       # shellcheck disable=SC2086 # options découpées volontairement
       text=$("$WHISPER_BIN" -m "$MODEL" -f "$wav" -l fr \
                --prompt "$prompt" --carry-initial-prompt \
-               --no-timestamps --no-prints $opts 2>/dev/null)
+               -sns --no-timestamps --no-prints $opts 2>/dev/null)
       t1=$(now)
       text=$(printf '%s' "$text" | tr '\n' ' ' | sed -e 's/  */ /g' -e 's/^ *//' -e 's/ *$//')
       ref="${wav%.wav}.txt"
