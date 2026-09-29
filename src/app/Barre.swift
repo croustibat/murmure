@@ -145,13 +145,15 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         dessinerIcone()
     }
 
-    // Au repos, une autorisation manquante marque l'onde d'un point d'exclamation.
+    // Une bulle à guillemets : la parole qui devient texte (l'onde est celle
+    // de Sillage). Pleine pendant l'écoute ; au repos, une autorisation
+    // manquante remplace les guillemets par un point d'exclamation.
     private func dessinerIcone() {
         let symbole: String
         switch etat ?? .pret {
-        case .pret: symbole = autorisations.manque ? "waveform.badge.exclamationmark" : "waveform"
-        case .ecoute: symbole = "waveform.circle.fill"
-        case .transcription: symbole = "ellipsis.circle"
+        case .pret: symbole = autorisations.manque ? "exclamationmark.bubble" : "quote.bubble"
+        case .ecoute: symbole = "quote.bubble.fill"
+        case .transcription: symbole = "ellipsis.bubble"
         }
         let image = NSImage(systemSymbolName: symbole, accessibilityDescription: "Murmure — \(ligneEtat.title)")
         image?.isTemplate = true
