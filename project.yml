@@ -55,6 +55,10 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+      - target: murmure-rec
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
     postBuildScripts:
       # VERSION reste la seule source du numéro affiché. L'Info.plist produit
       # en entrée ordonne la phase après son traitement par Xcode.
@@ -79,4 +83,18 @@ targets:
         PRODUCT_NAME: overlay
         PRODUCT_BUNDLE_IDENTIFIER: dev.croustibat.murmure.overlay
         # Jamais installé seul : il voyage dans le bundle de l'app.
+        SKIP_INSTALL: YES
+
+  # Enregistreur du micro (WAV 16 kHz mono et niveaux pour la pastille), lancé
+  # par murmure.sh à la place de ffmpeg. Son entitlement Micro est dans
+  # app/murmure-rec.entitlements, que script/sign_app.sh applique.
+  murmure-rec:
+    type: tool
+    platform: macOS
+    sources:
+      - path: src/rec
+    settings:
+      base:
+        PRODUCT_NAME: murmure-rec
+        PRODUCT_BUNDLE_IDENTIFIER: dev.croustibat.murmure.murmure-rec
         SKIP_INSTALL: YES
