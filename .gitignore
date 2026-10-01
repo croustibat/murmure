@@ -2,7 +2,12 @@
 models/
 *.bin
 
+# Projet généré par XcodeGen depuis project.yml
+Murmure.xcodeproj/
+
 # Artefacts de build
+build/
+dist/
 *.app/
 overlay
 *.o

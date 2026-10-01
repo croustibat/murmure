@@ -172,9 +172,11 @@ final class Autorisations: NSObject {
         }
     }
 
-    // Une version de l'app = une empreinte de ses sources (inscrite par install.sh).
+    // Une version de l'app = une empreinte de ses sources (inscrite par
+    // install.sh, vide pour une compilation de développement).
     private var empreinte: String {
-        Bundle.main.object(forInfoDictionaryKey: "MurmureSourceSum") as? String ?? versionMurmure
+        (Bundle.main.object(forInfoDictionaryKey: "MurmureSourceSum") as? String)
+            .flatMap { $0.isEmpty ? nil : $0 } ?? versionMurmure
     }
 
     private func lireMemoire() -> String? {
