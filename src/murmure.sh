@@ -246,8 +246,12 @@ start_recording() {
   local delay; delay=$(calc -v a="$t0" -v b="$(now)" 'BEGIN { printf "%d", (b - a) * 1000 }')
   if [ -e "$LEVELS" ]; then
     log "capture démarrée (pid $pid, prête en $delay ms)"
-  else
+  elif kill -0 "$pid" 2>/dev/null; then
     log "capture lancée (pid $pid), pas prête après $delay ms"
+  else
+    # Pas de micro, par exemple : le veilleur transcrit, donc signale l'erreur.
+    log "enregistreur arrêté au démarrage (pid $pid)"
+    return 0
   fi
   # Capture déjà arrêtée (second appui, Échap) : pas de ding.
   if [ "$(cat "$PID_FILE" 2>/dev/null)" = "$pid" ]; then ding Tink; fi
