@@ -5,7 +5,7 @@ models/
 # Projet généré par XcodeGen depuis project.yml
 Murmure.xcodeproj/
 
-# Artefacts de build
+# Artefacts de build (build/whisper : scripts/build-whisper.sh)
 build/
 dist/
 *.app/

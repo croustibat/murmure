@@ -274,6 +274,15 @@ scripts/bench.sh -n 5 dictee1.wav dictee2.wav
 scripts/bench.sh -c 'défaut|' -c 'glouton|-bs 1 -bo 1' dictee1.wav
 ```
 
+`-b` compare plusieurs binaires `whisper-cli`, par exemple celui que compile
+`scripts/build-whisper.sh` et celui de Homebrew ; la colonne « même texte » dit si
+chacun rend exactement la transcription de la première ligne :
+
+```bash
+scripts/bench.sh -c 'défaut|' -b 'embarqué|build/whisper/whisper-cli' \
+  -b 'Homebrew|/opt/homebrew/bin/whisper-cli' dictee1.wav dictee2.wav
+```
+
 ## Comment ça marche
 
 ```
