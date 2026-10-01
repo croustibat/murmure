@@ -57,7 +57,10 @@ load_config
 MODEL_NAME="${MURMURE_MODEL_NAME:-ggml-large-v3-turbo-q5_0.bin}"
 
 WHISPER_BIN="${MURMURE_WHISPER:-/opt/homebrew/bin/whisper-cli}"
-FFMPEG_BIN="${MURMURE_FFMPEG:-/opt/homebrew/bin/ffmpeg}"
+# Enregistreur natif (src/rec), compilé par install.sh. MURMURE_FFMPEG (chemin
+# d'ffmpeg) rétablit l'ancien enregistrement, le temps de la transition.
+REC_BIN="${MURMURE_REC:-$MURMURE_HOME/murmure-rec}"
+FFMPEG_BIN="${MURMURE_FFMPEG:-}"
 MODEL="${MURMURE_MODEL:-$MURMURE_HOME/models/$MODEL_NAME}"
 LANGUAGE="${MURMURE_LANG:-fr}"
 DEVICE="${MURMURE_DEVICE:-:0}"
@@ -74,7 +77,7 @@ CADENCE="${MURMURE_CADENCE:-$MURMURE_HOME/cadence}"   # vitesse mesurée de la m
 read -r -a WHISPER_ARGS <<<"${MURMURE_WHISPER_ARGS:-}"
 
 STATE_DIR="${MURMURE_STATE_DIR:-/tmp/murmure-$(id -u)}"
-PID_FILE="$STATE_DIR/ffmpeg.pid"
+PID_FILE="$STATE_DIR/rec.pid"
 WAV="$STATE_DIR/recording.wav"
 LEVELS="$STATE_DIR/levels"   # niveau RMS de la voix, lu par la pastille
 LOG="$STATE_DIR/murmure.log"
@@ -107,8 +110,9 @@ for note in ${CONFIG_NOTES[@]+"${CONFIG_NOTES[@]}"}; do log "$note"; done
 # des processus distincts, un seul doit l'arrêter.
 claim_capture() { mv "$PID_FILE" "$PID_FILE.$$" 2>/dev/null; }
 
-# Coupe ffmpeg (SIGINT pour qu'il finalise le WAV, SIGKILL en dernier recours).
-stop_ffmpeg() {
+# Coupe l'enregistreur (SIGINT pour qu'il finalise le WAV, SIGKILL en dernier
+# recours).
+stop_capture() {
   local pid; pid=$(cat "$PID_FILE.$$" 2>/dev/null)
   rm -f "$PID_FILE.$$" "$STARTED" "$LEVELS"
   if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
@@ -168,8 +172,9 @@ paste_into() {
   return 1
 }
 
-# MURMURE_DEVICE accepte un index avfoundation (« :0 ») ou un nom de micro,
-# résolu ici en index : l'index change quand on branche un casque, pas le nom.
+# MURMURE_DEVICE accepte un index (« :0 ») ou un nom de micro. murmure-rec le
+# résout lui-même ; pour ffmpeg, le nom est résolu ici en index avfoundation :
+# l'index change quand on branche un casque, pas le nom.
 # Nom exact (casse ignorée), sinon premier micro dont le nom le contient.
 # « :default » (micro par défaut du système) est compris tel quel par ffmpeg.
 resolve_device() {
@@ -195,36 +200,57 @@ resolve_device() {
 }
 
 start_recording() {
-  [ -x "$FFMPEG_BIN" ] || die "ffmpeg introuvable"
+  if [ -n "$FFMPEG_BIN" ]; then
+    [ -x "$FFMPEG_BIN" ] || die "ffmpeg introuvable"
+  else
+    [ -x "$REC_BIN" ] || die "Enregistreur introuvable"
+  fi
   [ -f "$MODEL" ]      || die "Modèle Whisper introuvable"
-  resolve_device
   rm -f "$WAV" "$LEVELS"
   local size; size=$(stat -f%z "$LOG" 2>/dev/null || echo 0)
   [ "$size" -gt "$LOG_MAX" ] && mv -f "$LOG" "$LOG.1"
-  # Niveau RMS écrit 20 fois par seconde (trames de 800 échantillons à 16 kHz)
-  # pour l'onde de la pastille ; astats ne modifie pas l'audio enregistré.
-  # Le fichier croît d'environ 1,5 Ko/s, borné par MAX_SECONDS.
-  nohup "$FFMPEG_BIN" -hide_banner -loglevel error \
-      -f avfoundation -i "$DEVICE" \
-      -af "aresample=16000,asetnsamples=n=800:p=0,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$LEVELS:direct=1" \
-      -t "$MAX_SECONDS" -ar 16000 -ac 1 -y "$WAV" \
-      >>"$LOG" 2>&1 &
+  # Niveau RMS écrit 20 fois par seconde (trames de 50 ms à 16 kHz) pour l'onde
+  # de la pastille. Le fichier croît d'environ 1,5 Ko/s, borné par MAX_SECONDS.
+  if [ -n "$FFMPEG_BIN" ]; then
+    resolve_device
+    # astats ne modifie pas l'audio enregistré.
+    nohup "$FFMPEG_BIN" -hide_banner -loglevel error \
+        -f avfoundation -i "$DEVICE" \
+        -af "aresample=16000,asetnsamples=n=800:p=0,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$LEVELS:direct=1" \
+        -t "$MAX_SECONDS" -ar 16000 -ac 1 -y "$WAV" \
+        >>"$LOG" 2>&1 &
+  else
+    nohup "$REC_BIN" --device "$DEVICE" --max "$MAX_SECONDS" --levels "$LEVELS" "$WAV" \
+        >>"$LOG" 2>&1 &
+  fi
   local pid=$! t0; t0=$(now)
   echo "$t0" >"$STARTED"
   echo $pid >"$PID_FILE"
-  # À la limite, ffmpeg s'arrête seul (-t) : on transcrit alors comme sur un
-  # second appui. Une seconde de marge laisse ffmpeg finaliser le WAV ; expire
-  # vérifie pid et horodatage pour ne jamais couper une capture suivante.
-  nohup /bin/bash -c 'sleep "$1" && exec /bin/bash "$2" expire "$3" "$4"' _ \
-      "$((MAX_SECONDS + 1))" "$0" "$pid" "$t0" >>"$LOG" 2>&1 &
-  log "capture démarrée (pid $pid)"
-  remember_target   # après ffmpeg : ne pas retarder la capture
-  ding Tink
-
   printf 'recording %s' "$MAX_SECONDS" >"$STATUS"   # durée max : compte à rebours
   pkill -f "$OVERLAY" 2>/dev/null
   [ -x "$OVERLAY" ] && nohup "$OVERLAY" "$STATUS" "$MURMURE_HOME/murmure.sh" \
       >>"$LOG" 2>&1 &
+  # L'enregistreur s'arrête seul à la limite : on transcrit alors comme sur un
+  # second appui. Après un arrêt ou une annulation, expire ne trouve plus la
+  # capture (pid et horodatage) et ne fait rien : rien ne survit à la capture.
+  nohup /bin/bash -c 'while kill -0 "$1" 2>/dev/null; do sleep 0.2; done; exec /bin/bash "$2" expire "$1" "$3"' _ \
+      "$pid" "$0" "$t0" >>"$LOG" 2>&1 &
+  remember_target   # pendant que le micro démarre
+
+  # Le ding attend que la capture tourne (fichier de niveaux créé, ~0,3 s) :
+  # parler dès le ding ne coupe plus le début de la phrase. 1,5 s au plus.
+  for _ in $(seq 1 75); do
+    { [ -e "$LEVELS" ] || ! kill -0 "$pid" 2>/dev/null; } && break
+    sleep 0.02
+  done
+  local delay; delay=$(calc -v a="$t0" -v b="$(now)" 'BEGIN { printf "%d", (b - a) * 1000 }')
+  if [ -e "$LEVELS" ]; then
+    log "capture démarrée (pid $pid, prête en $delay ms)"
+  else
+    log "capture lancée (pid $pid), pas prête après $delay ms"
+  fi
+  # Capture déjà arrêtée (second appui, Échap) : pas de ding.
+  if [ "$(cat "$PID_FILE" 2>/dev/null)" = "$pid" ]; then ding Tink; fi
 }
 
 # Met la dictée au presse-papiers. Avec MURMURE_RESTORE_CLIPBOARD=1, l'app
@@ -292,7 +318,7 @@ stop_and_transcribe() {
   claim_capture || exit 0
   echo $$ >"$BUSY"
   trap 'rm -f "$BUSY"' EXIT
-  stop_ffmpeg
+  stop_capture
   ding Pop
   printf 'transcribing' >"$STATUS"
   local t0; t0=$(now)
@@ -314,8 +340,12 @@ stop_and_transcribe() {
   # Garde anti-silence : sans autorisation Micro, macOS livre un flux muet
   # au lieu d'une erreur, et Whisper invente alors du texte.
   local peak
-  peak=$("$FFMPEG_BIN" -hide_banner -i "$WAV" -af volumedetect -f null - 2>&1 \
-         | sed -n 's/.*max_volume: \(-*[0-9.]*\) dB.*/\1/p' | head -1)
+  if [ -n "$FFMPEG_BIN" ]; then
+    peak=$("$FFMPEG_BIN" -hide_banner -i "$WAV" -af volumedetect -f null - 2>&1 \
+           | sed -n 's/.*max_volume: \(-*[0-9.]*\) dB.*/\1/p' | head -1)
+  else
+    peak=$("$REC_BIN" --peak "$WAV" 2>>"$LOG")
+  fi
   log "pic sonore: ${peak:-?} dB"
   if [ -n "$peak" ] && [ "${peak%.*}" -lt "$SILENCE_DB" ] 2>/dev/null; then
     die "Aucun son capté — autorise le Micro pour Murmure"
@@ -389,7 +419,7 @@ stop_and_transcribe() {
 # Annulation : on coupe l'écoute, rien n'est transcrit ni collé.
 cancel_recording() {
   claim_capture || return 0
-  stop_ffmpeg
+  stop_capture
   rm -f "$WAV" "$STATUS" "$TARGET"
   log "capture annulée"
   ding Funk
@@ -415,10 +445,14 @@ toggle() {
 
 case "${1:-toggle}" in
   toggle|press) toggle ;;
-  expire)   # minuterie de start_recording : $2 pid ffmpeg, $3 horodatage
+  expire)   # enregistreur arrêté seul : $2 son pid, $3 horodatage du début
     if [ "$(cat "$PID_FILE" 2>/dev/null)" = "${2:-}" ] \
        && [ "$(cat "$STARTED" 2>/dev/null)" = "${3:-}" ]; then
-      log "durée maximale atteinte (${MAX_SECONDS} s)"
+      if calc -v a="$3" -v b="$(now)" -v m="$MAX_SECONDS" 'BEGIN { exit !(b - a >= m) }'; then
+        log "durée maximale atteinte (${MAX_SECONDS} s)"
+      else
+        log "enregistreur arrêté avant la durée maximale"
+      fi
       stop_and_transcribe
     fi ;;
   release)

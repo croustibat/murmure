@@ -4,9 +4,9 @@ import AppKit
 // Onde animée + libellé + bouton stop + ✕ (annuler). L'état est lu dans un fichier :
 // « recording <durée max> », « transcribing <durée estimée> », « pasting », et sa
 // disparition ferme la fenêtre. Pendant l'écoute, l'onde suit le niveau RMS
-// qu'écrit ffmpeg dans « levels », à côté du fichier d'état, et le libellé
-// devient un compte à rebours à l'approche de la durée max (début de capture
-// lu dans « started »). Pendant la transcription, les points de l'onde
+// qu'écrit l'enregistreur (au format d'ffmpeg) dans « levels », à côté du
+// fichier d'état, et le libellé devient un compte à rebours à l'approche de la
+// durée max (début de capture lu dans « started »). Pendant la transcription, les points de l'onde
 // servent de jauge et s'allument un à un.
 
 let statusPath = CommandLine.arguments.count > 1
