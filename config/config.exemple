@@ -13,10 +13,11 @@
 #MURMURE_LANG=fr
 
 # Micro : un index (« :0 », « :1 »…) ou un nom, plus robuste car l'index change
-# quand on branche un casque. Liste des micros :
-#   ffmpeg -f avfoundation -list_devices true -i ""
-# (section « AVFoundation audio devices »). Nom introuvable : micro :0.
-# « :default » suit le micro par défaut du système.
+# quand on branche un casque. Liste des micros, dans l'ordre des index :
+#   ~/.local/share/murmure/murmure-rec --list-devices
+# Nom exact (casse ignorée), sinon premier micro dont le nom le contient ;
+# introuvable : micro par défaut du système. « :default » suit le micro par
+# défaut du système.
 #MURMURE_DEVICE=:0
 #MURMURE_DEVICE=MacBook Pro Microphone
 

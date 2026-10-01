@@ -57,12 +57,10 @@ sha256() { shasum -a 256 "$1" | cut -d' ' -f1; }
 
 step "Vérification des dépendances"
 command -v brew >/dev/null || fail "Homebrew est requis : https://brew.sh"
-command -v ffmpeg  >/dev/null || { step "Installation de ffmpeg";  brew install ffmpeg; }
 command -v whisper-cli >/dev/null || { step "Installation de whisper.cpp"; brew install whisper-cpp; }
-command -v ffmpeg >/dev/null     || fail "ffmpeg introuvable après installation."
 command -v whisper-cli >/dev/null || fail "whisper-cli introuvable après installation."
-ok "ffmpeg et whisper-cli présents"
-command -v swiftc >/dev/null || fail "swiftc requis pour la pastille et l'app : xcode-select --install"
+ok "whisper-cli présent"
+command -v swiftc >/dev/null || fail "swiftc requis pour la pastille, l'enregistreur et l'app : xcode-select --install"
 ok "swiftc présent"
 
 step "Installation des fichiers dans $MURMURE_HOME"
@@ -101,6 +99,21 @@ else
   echo "$OVERLAY_SUM" > "$MURMURE_HOME/overlay.sha256"
   ok "overlay compilé"
   note "pastille : recompilée"
+fi
+
+# Enregistreur du micro, à la place de ffmpeg : même empreinte que la pastille.
+# Une capture en cours garde l'ancien binaire, mv remplace le chemin seul.
+step "Compilation de l'enregistreur"
+REC_SUM="$( { shasum -a 256 < "$SRC/src/rec/main.swift"; swiftc --version 2>&1 | head -1; } | shasum -a 256 | cut -d' ' -f1)"
+if [ -x "$MURMURE_HOME/murmure-rec" ] && [ "$(cat "$MURMURE_HOME/murmure-rec.sha256" 2>/dev/null)" = "$REC_SUM" ]; then
+  ok "murmure-rec déjà à jour"
+  note "enregistreur : inchangé"
+else
+  swiftc -O -o "$MURMURE_HOME/murmure-rec.new" "$SRC/src/rec/main.swift"
+  mv -f "$MURMURE_HOME/murmure-rec.new" "$MURMURE_HOME/murmure-rec"
+  echo "$REC_SUM" > "$MURMURE_HOME/murmure-rec.sha256"
+  ok "murmure-rec compilé"
+  note "enregistreur : recompilé"
 fi
 
 # Téléchargement vers .part avec reprise (curl -C -), vérification SHA-256, puis
