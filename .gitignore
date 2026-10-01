@@ -2,7 +2,8 @@
 models/
 *.bin
 
-# Artefacts de build
+# Artefacts de build (build/whisper : scripts/build-whisper.sh)
+build/
 *.app/
 overlay
 *.o
