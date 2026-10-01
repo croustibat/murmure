@@ -31,8 +31,8 @@ il transforme votre voix en texte, partout, sans rien envoyer nulle part.
 
 ## Installation
 
-Prérequis : macOS 14 ou plus, [Homebrew](https://brew.sh), et les outils en ligne de
-commande Xcode (`xcode-select --install`).
+Prérequis : macOS 14 ou plus, [Homebrew](https://brew.sh), et
+[Xcode](https://apps.apple.com/app/xcode/id497799835) (ouvert une fois).
 
 ```bash
 git clone https://github.com/croustibat/murmure.git
@@ -40,9 +40,9 @@ cd murmure
 ./install.sh
 ```
 
-L'installeur pose `ffmpeg` et `whisper-cpp`, télécharge le modèle (~550 Mo, une fois),
-compile la pastille et l'app `/Applications/Murmure.app`, puis la lance : son icône
-apparaît dans la barre des menus.
+L'installeur pose `ffmpeg`, `whisper-cpp` et XcodeGen, télécharge le modèle (~550 Mo,
+une fois), compile l'app `/Applications/Murmure.app` et sa pastille, puis la lance :
+son icône apparaît dans la barre des menus.
 
 Le menu signale une nouvelle version (« Version X.Y.Z disponible », qui ouvre la page
 de la release). Pour mettre à jour, `git pull` puis `./install.sh` à nouveau. L'installeur ne remplace

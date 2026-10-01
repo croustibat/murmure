@@ -1,10 +1,59 @@
 # Contribuer à Murmure
 
+## Compiler
+
+Il faut Xcode (ouvert une fois) et XcodeGen (`brew install xcodegen`). L'app est
+décrite par `project.yml` ; `Murmure.xcodeproj` en est généré et n'est pas versionné.
+
+```bash
+script/build_and_run.sh               # Debug : génère, compile, signe et lance
+script/build_and_run.sh --build-only  # sans lancer
+```
+
+Le build va dans `~/Library/Caches/Murmure/Build` (`MURMURE_BUILD_DIR` pour un autre
+dossier), hors des dossiers synchronisés par iCloud. Il est signé comme le fait
+`install.sh` : Developer ID, sinon Apple Development, sinon ad hoc
+(`MURMURE_SIGN_IDENTITY` pour choisir, « - » pour ad hoc). Même identifiant
+(`dev.croustibat.murmure`) et même certificat que l'app installée : il en partage les
+autorisations Micro et Accessibilité.
+
+Ce build lit l'installation par défaut (`~/.local/share/murmure`) ; les variables
+`MURMURE_*` de l'environnement lui sont transmises. Une seule Murmure tourne par
+dossier d'état : quitter l'app installée, ou lancer le build à côté :
+
+```bash
+MURMURE_STATE_DIR=/tmp/murmure-dev MURMURE_SHORTCUT=ctrl+alt+shift+cmd+f19 script/build_and_run.sh
+```
+
+Sans les scripts, `xcodegen generate && xcodebuild -scheme Murmure` produit une app
+signée ad hoc, dans les DerivedData de Xcode.
+
+Le bundle contient l'app (`src/app/`) et, dans `Contents/Helpers`, les outils lancés
+par `murmure.sh` : aujourd'hui la pastille (`overlay`, `src/overlay.swift`). Il tourne
+sous runtime durci, avec deux entitlements (`app/Murmure.entitlements`) :
+`com.apple.security.device.audio-input` (sans lui, le micro rend un flux muet) et
+`com.apple.security.automation.apple-events` (le ⌘V passe par System Events).
+
+```bash
+codesign -d --entitlements - Murmure.app   # les deux entitlements
+codesign -dv Murmure.app                   # flags=0x10000(runtime)
+```
+
+Ajouter un outil dans `Contents/Helpers` : une cible `type: tool` dans `project.yml`,
+un bloc dans les `dependencies` de la cible `Murmure` (sur le modèle d'`overlay`), et
+ses sources dans `APP_SOURCES` d'`install.sh`, pour qu'une modification recompile
+l'app. `script/sign_app.sh` le signe sans autre changement ; s'il lui faut des
+entitlements, les mettre dans `app/<outil>.entitlements`.
+
+Numéros de version : `CFBundleShortVersionString` est lu dans `VERSION` à la
+compilation (phase « Version » de `project.yml`) ; `CFBundleVersion`, dans
+`app/Info.plist`, est un entier augmenté de 1 à chaque release, que Sparkle compare.
+
 ## Publier une version
 
 Les versions sont des **GitHub Releases** étiquetées `vX.Y.Z`. `Murmure.app` lit la
 dernière (`/repos/croustibat/murmure/releases/latest`) au plus une fois par jour et
-la compare à son propre numéro, tiré du fichier `VERSION` par `install.sh`
+la compare à son propre numéro, tiré du fichier `VERSION` à la compilation
 (`CFBundleShortVersionString`). Une release plus récente fait apparaître « Version
 X.Y.Z disponible » dans le menu, qui ouvre sa page.
 
@@ -16,6 +65,8 @@ pré-version ne la déclenchent. La comparaison est numérique (`1.10.0` > `1.9.
    - correctif : `1.1.0` → `1.1.1` ;
    - fonctionnalité : `1.1.0` → `1.2.0` ;
    - changement qui oblige à réinstaller ou à reconfigurer : `1.1.0` → `2.0.0`.
+
+   Augmenter aussi de 1 `CFBundleVersion` dans `app/Info.plist`.
 
    Committer (« Version 1.2.0 ») et pousser.
 
