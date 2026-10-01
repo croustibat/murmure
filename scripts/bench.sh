@@ -2,16 +2,20 @@
 # Banc d'essai des options de whisper-cli, avec les options réelles de Murmure
 # (prompt de vocabulaire, --carry-initial-prompt, -sns, -l fr).
 #
-#   scripts/bench.sh [-n exécutions] [-c 'nom|options'] … audio.wav …
+#   scripts/bench.sh [-n exécutions] [-b 'nom|whisper-cli'] … [-c 'nom|options'] … audio.wav …
 #
 # Chaque configuration est un nom et des options ajoutées à la commande de base.
+# Avec -b, chaque configuration tourne avec chacun des binaires donnés (par
+# exemple celui de scripts/build-whisper.sh contre celui de Homebrew) ; sans -b,
+# c'est $MURMURE_WHISPER, sinon celui de Homebrew.
 # Dans les options, @AC est remplacé par une fenêtre audio proportionnelle à la
 # durée du fichier (voir audio_ctx) et @VAD par le chemin du modèle VAD.
 # Les configurations sont entrelacées (A B C A B C…) pour que la charge du
 # système pèse autant sur chacune ; on retient la médiane du temps réel, modèle
 # chargé compris, puisque Murmure le recharge à chaque dictée.
 # Si audio.txt existe à côté d'audio.wav, le taux d'erreur par mot (WER) de
-# chaque transcription est calculé par rapport à ce texte de référence.
+# chaque transcription est calculé par rapport à ce texte de référence. La
+# synthèse dit aussi si chaque ligne rend exactement le texte de la première.
 set -uo pipefail
 export LC_ALL=C
 
@@ -25,15 +29,17 @@ OUT="${BENCH_OUT:-$(mktemp -d /tmp/murmure-bench.XXXXXX)}"
 RUNS=5
 
 CONFIGS=()
-while getopts 'n:c:' opt; do
+BINS=()
+while getopts 'n:b:c:' opt; do
   case $opt in
     n) RUNS=$OPTARG ;;
+    b) BINS+=("$OPTARG") ;;
     c) CONFIGS+=("$OPTARG") ;;
     *) exit 2 ;;
   esac
 done
 shift $((OPTIND - 1))
-[ $# -gt 0 ] || { echo "usage : $0 [-n exécutions] [-c 'nom|options'] audio.wav …" >&2; exit 2; }
+[ $# -gt 0 ] || { echo "usage : $0 [-n exécutions] [-b 'nom|whisper-cli'] [-c 'nom|options'] audio.wav …" >&2; exit 2; }
 [ ${#CONFIGS[@]} -gt 0 ] || CONFIGS=(
   'défaut|'
   'glouton|-bs 1 -bo 1'
@@ -44,6 +50,21 @@ shift $((OPTIND - 1))
   'threads 6|-t 6'
   'vad|--vad -vm @VAD'
 )
+[ ${#BINS[@]} -gt 0 ] || BINS=("whisper-cli|$WHISPER_BIN")
+for b in "${BINS[@]}"; do
+  [ -x "${b#*|}" ] || { echo "whisper-cli introuvable : ${b#*|}" >&2; exit 2; }
+done
+
+# Une mesure par configuration et par binaire : « nom|binaire|options », le nom
+# portant aussi celui du binaire quand plusieurs sont comparés.
+JOBS=()
+for c in "${CONFIGS[@]}"; do
+  for b in "${BINS[@]}"; do
+    name=${c%%|*}
+    [ ${#BINS[@]} -gt 1 ] && name="$name · ${b%%|*}"
+    JOBS+=("$name|${b#*|}|${c#*|}")
+  done
+done
 
 now() { perl -MTime::HiRes=time -e 'printf "%.3f", time'; }
 duration() { ffprobe -v error -show_entries format=duration -of csv=p=0 "$1"; }
@@ -79,14 +100,16 @@ echo "résultats dans $OUT" >&2
 for run in $(seq 1 "$RUNS"); do
   for wav in "$@"; do
     ac=$(audio_ctx "$wav")
-    for i in "${!CONFIGS[@]}"; do
-      name=${CONFIGS[$i]%%|*}
-      opts=${CONFIGS[$i]#*|}
+    for i in "${!JOBS[@]}"; do
+      name=${JOBS[$i]%%|*}
+      opts=${JOBS[$i]#*|}
+      bin=${opts%%|*}
+      opts=${opts#*|}
       opts=${opts//@AC/$ac}
       opts=${opts//@VAD/$VAD_MODEL}
       t0=$(now)
       # shellcheck disable=SC2086 # options découpées volontairement
-      text=$("$WHISPER_BIN" -m "$MODEL" -f "$wav" -l fr \
+      text=$("$bin" -m "$MODEL" -f "$wav" -l fr \
                --prompt "$prompt" --carry-initial-prompt \
                -sns --no-timestamps --no-prints $opts 2>/dev/null)
       t1=$(now)
@@ -100,8 +123,9 @@ for run in $(seq 1 "$RUNS"); do
   done
 done
 
-# Synthèse : médiane par fichier et configuration, gain relatif à la première.
-names=$(printf '%s\n' "${CONFIGS[@]}" | cut -d'|' -f1)
+# Synthèse : médiane par fichier et configuration, gain et texte comparés à la
+# première.
+names=$(printf '%s\n' "${JOBS[@]}" | cut -d'|' -f1)
 perl -CSDA -Mutf8 -F'\t' -lane '
   BEGIN { @names = split /\n/, shift @ARGV }
   push @{$t{$F[1]}{$F[2]}}, $F[3]; push @{$w{$F[1]}{$F[2]}}, $F[4];
@@ -111,16 +135,18 @@ perl -CSDA -Mutf8 -F'\t' -lane '
   END {
     for my $f (sort keys %files) {
       print "\n### $f\n";
-      print "| configuration | médiane | gain | WER médian | transcriptions distinctes |";
-      print "|---|---:|---:|---:|---:|";
+      print "| configuration | médiane | gain | WER médian | transcriptions distinctes | même texte |";
+      print "|---|---:|---:|---:|---:|:---:|";
       my $ref = med(@{$t{$f}{0}});
+      my $reftxt = join "\n", sort keys %{$txt{$f}{0}};
       for my $i (0 .. $#names) {
         next unless $t{$f}{$i};
         my $m = med(@{$t{$f}{$i}});
         my @ws = grep { $_ ne "-" } @{$w{$f}{$i}};
-        printf "| %s | %.2f s | %+.0f %% | %s | %d |\n", $names[$i], $m,
+        my $same = $i == 0 ? "réf." : (join("\n", sort keys %{$txt{$f}{$i}}) eq $reftxt ? "oui" : "non");
+        printf "| %s | %.2f s | %+.0f %% | %s | %d | %s |\n", $names[$i], $m,
           100 * ($ref - $m) / $ref, @ws ? sprintf("%.1f %%", med(@ws)) : "-",
-          scalar keys %{$txt{$f}{$i}};
+          scalar keys %{$txt{$f}{$i}}, $same;
       }
       print "\n<details><summary>Transcriptions</summary>\n";
       for my $i (0 .. $#names) {
