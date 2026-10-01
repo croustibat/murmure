@@ -23,7 +23,7 @@ case "$a" in [oO]*) ;; *) echo "Annulé."; exit 0 ;; esac
 # LaunchAgent), puis l'app résidente est quittée.
 [ -x "$APP/Contents/MacOS/Murmure" ] && "$APP/Contents/MacOS/Murmure" --demarrage non >/dev/null 2>&1 || true
 pkill -f "$APP/Contents/MacOS/Murmure" 2>/dev/null || true
-pkill -f "$MURMURE_HOME/overlay" 2>/dev/null || true
+pkill -f "$APP/Contents/Helpers/overlay" 2>/dev/null || true   # pastille
 rm -rf "$APP" "$MURMURE_HOME" "$STATE_DIR"
 [ -n "$OLD_APP" ] && { pkill -f "$OLD_APP/Contents/MacOS/Murmure" 2>/dev/null || true; rm -rf "$OLD_APP"; }
 [ -f "$KB" ] && rm -f "$KB"

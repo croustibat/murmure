@@ -57,13 +57,16 @@ sha256() { shasum -a 256 "$1" | cut -d' ' -f1; }
 
 step "Vérification des dépendances"
 command -v brew >/dev/null || fail "Homebrew est requis : https://brew.sh"
-command -v ffmpeg  >/dev/null || { step "Installation de ffmpeg";  brew install ffmpeg; }
 command -v whisper-cli >/dev/null || { step "Installation de whisper.cpp"; brew install whisper-cpp; }
-command -v ffmpeg >/dev/null     || fail "ffmpeg introuvable après installation."
 command -v whisper-cli >/dev/null || fail "whisper-cli introuvable après installation."
-ok "ffmpeg et whisper-cli présents"
-command -v swiftc >/dev/null || fail "swiftc requis pour la pastille et l'app : xcode-select --install"
-ok "swiftc présent"
+ok "whisper-cli présent"
+# Murmure.app se compile avec Xcode, à partir du projet que XcodeGen génère
+# depuis project.yml.
+xcodebuild -version >/dev/null 2>&1 \
+  || fail "Xcode est requis pour compiler Murmure.app : installez-le (App Store), ouvrez-le une fois, puis sudo xcode-select -s /Applications/Xcode.app"
+command -v xcodegen >/dev/null || { step "Installation de XcodeGen"; brew install xcodegen; }
+command -v xcodegen >/dev/null || fail "xcodegen introuvable après installation."
+ok "Xcode et XcodeGen présents"
 
 step "Installation des fichiers dans $MURMURE_HOME"
 mkdir -p "$MURMURE_HOME/models"
@@ -86,22 +89,6 @@ else
   note "config : installé"
 fi
 ok "scripts et configuration en place"
-
-# swiftc ne produit pas deux fois le même binaire : on compare l'empreinte de la
-# source et du compilateur pour savoir s'il faut recompiler.
-step "Compilation de la pastille"
-OVERLAY_SUM="$( { shasum -a 256 < "$SRC/src/overlay.swift"; swiftc --version 2>&1 | head -1; } | shasum -a 256 | cut -d' ' -f1)"
-if [ -x "$MURMURE_HOME/overlay" ] && [ "$(cat "$MURMURE_HOME/overlay.sha256" 2>/dev/null)" = "$OVERLAY_SUM" ]; then
-  ok "overlay déjà à jour"
-  note "pastille : inchangée"
-else
-  swiftc -O -o "$MURMURE_HOME/overlay.new" "$SRC/src/overlay.swift"
-  pkill -f "$MURMURE_HOME/overlay" 2>/dev/null || true   # pastille encore affichée
-  mv -f "$MURMURE_HOME/overlay.new" "$MURMURE_HOME/overlay"
-  echo "$OVERLAY_SUM" > "$MURMURE_HOME/overlay.sha256"
-  ok "overlay compilé"
-  note "pastille : recompilée"
-fi
 
 # Téléchargement vers .part avec reprise (curl -C -), vérification SHA-256, puis
 # mv atomique : un fichier tronqué ne peut plus passer pour un modèle valide.
@@ -161,20 +148,22 @@ fi
 # Le bundle .app est indispensable : un script nu n'a pas d'identité TCC, macOS ne
 # propose jamais l'autorisation micro et livre un flux muet à la place.
 # Les autorisations Micro et Accessibilité suivent la signature : on ne recrée ni
-# ne re-signe le bundle que si son contenu ou l'identité de signature change. swiftc ne produisant pas deux
-# fois le même binaire, Info.plist porte l'empreinte des sources de l'app, de son
-# icône et du compilateur : l'app n'est recompilée que si cette empreinte change.
+# ne re-signe le bundle que si son contenu ou l'identité de signature change.
+# Info.plist porte l'empreinte de tout ce qui entre dans le bundle et de la
+# version de Xcode : l'app n'est recompilée que si cette empreinte change.
 # Les mises à jour de murmure.sh ne la touchent pas.
 step "Création de Murmure.app"
-STAGE="$(mktemp -d)"
-trap 'rm -rf "$STAGE"' EXIT
 VERSION="$(tr -d '[:space:]' < "$SRC/VERSION")"
-APP_SUM="$( { cat "$SRC"/src/app/*.swift | shasum -a 256; shasum -a 256 < "$SRC/app/Murmure.icns"; swiftc --version 2>&1 | head -1; } | shasum -a 256 | cut -d' ' -f1)"
-cp "$SRC/app/Info.plist" "$STAGE/Info.plist"
-plutil -replace CFBundleShortVersionString -string "$VERSION" "$STAGE/Info.plist"
-plutil -replace CFBundleVersion -string "$VERSION" "$STAGE/Info.plist"
-plutil -replace MurmureHome -string "$MURMURE_HOME" "$STAGE/Info.plist"
-plutil -replace MurmureSourceSum -string "$APP_SUM" "$STAGE/Info.plist"
+# Ce que project.yml compile, copie ou signe dans le bundle : un nouvel outil
+# de Contents/Helpers y ajoute ses sources.
+APP_SOURCES=(project.yml VERSION app src/app src/overlay.swift src/rec script/sign_app.sh)
+APP_SUM="$( { (cd "$SRC" && find "${APP_SOURCES[@]}" -type f ! -name .DS_Store -print0 \
+  | LC_ALL=C sort -z | xargs -0 shasum -a 256); xcodebuild -version; } | shasum -a 256 | cut -d' ' -f1)"
+# Hors des dossiers synchronisés par iCloud, comme script/build_and_run.sh.
+BUILD_DIR="${MURMURE_BUILD_DIR:-$HOME/Library/Caches/Murmure/Build}"
+info_of() {  # app clé → valeur dans Info.plist, vide si absente
+  /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null || true
+}
 
 # Identité de signature. Signée par un certificat, l'app est reconnue par macOS
 # à son identifiant et à son équipe : les autorisations survivent aux
@@ -207,18 +196,19 @@ signer_of() {  # app → nom du certificat, ou « - » si ad hoc
   who="$(codesign -dvv "$1" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
   echo "${who:--}"
 }
-# Signe l'app ; un certificat inutilisable (trousseau verrouillé, en SSH par
-# exemple) laisse une signature ad hoc plutôt qu'une app non signée.
+# Signe l'app et ses outils (runtime durci, entitlements) ; un certificat
+# inutilisable (trousseau verrouillé, en SSH par exemple) laisse une signature
+# ad hoc plutôt qu'une app non signée.
 sign_app() {
   if [ "$SIGN_HASH" != "-" ] \
-     && codesign --force --sign "$SIGN_HASH" --timestamp=none "$APP" >/dev/null 2>&1; then
+     && "$SRC/script/sign_app.sh" "$SIGN_HASH" "$APP" --timestamp=none >/dev/null 2>&1; then
     return
   fi
   if [ "$SIGN_HASH" != "-" ]; then
     warn "signature avec « $SIGN_NAME » impossible — signature ad hoc"
     SIGN_HASH="-"; SIGN_NAME="-"
   fi
-  codesign --force --sign - "$APP" >/dev/null 2>&1 || warn "signature ad hoc impossible"
+  "$SRC/script/sign_app.sh" - "$APP" >/dev/null 2>&1 || warn "signature ad hoc impossible"
 }
 # Autorisations à redonner : l'identité de l'app a changé, ou elle est ad hoc
 # (nouveau binaire, nouvelle empreinte).
@@ -227,18 +217,19 @@ PREV_SIGNER=""
 identity_changed() { [ -n "$PREV_SIGNER" ] && { [ "$SIGN_NAME" = "-" ] || [ "$PREV_SIGNER" != "$SIGN_NAME" ]; }; }
 signed_as() { if [ "$SIGN_NAME" = "-" ]; then echo "ad hoc"; else echo "$SIGN_NAME"; fi; }
 
-if [ -d "$APP" ] \
-   && cmp -s "$STAGE/Info.plist" "$APP/Contents/Info.plist" \
-   && [ -x "$APP/Contents/MacOS/Murmure" ] \
-   && cmp -s "$SRC/app/Murmure.icns" "$APP/Contents/Resources/Murmure.icns" \
+# Même contenu : mêmes sources, compilées pour le même dossier d'installation.
+same_content() {
+  [ -d "$APP" ] && [ -x "$APP/Contents/MacOS/Murmure" ] \
+    && [ "$(info_of "$APP" MurmureSourceSum)" = "$APP_SUM" ] \
+    && [ "$(info_of "$APP" MurmureHome)" = "$MURMURE_HOME" ]
+}
+
+if same_content \
    && codesign --verify "$APP" >/dev/null 2>&1 \
    && [ "$PREV_SIGNER" = "$SIGN_NAME" ]; then
   ok "$APP inchangée — signature et autorisations conservées"
   note "Murmure.app : inchangée"
-elif [ -d "$APP" ] \
-   && cmp -s "$STAGE/Info.plist" "$APP/Contents/Info.plist" \
-   && [ -x "$APP/Contents/MacOS/Murmure" ] \
-   && cmp -s "$SRC/app/Murmure.icns" "$APP/Contents/Resources/Murmure.icns"; then
+elif same_content; then
   # Même contenu, autre identité : re-signer suffit.
   pkill -f "$APP/Contents/MacOS/Murmure" 2>/dev/null || true
   sign_app
@@ -250,9 +241,17 @@ elif [ -d "$APP" ] \
   fi
   ok "$APP signée ($(signed_as))"
 else
-  swiftc -O -parse-as-library -o "$STAGE/Murmure" "$SRC"/src/app/*.swift \
-    || fail "compilation de Murmure.app impossible"
+  # Compilée sans signer : sign_app signe ensuite l'app installée, outils compris.
+  mkdir -p "$BUILD_DIR"
+  BUILD_LOG="$BUILD_DIR/install.log"
+  (cd "$SRC" && xcodegen generate --quiet) || fail "génération du projet Xcode impossible (project.yml)"
+  xcodebuild -project "$SRC/Murmure.xcodeproj" -scheme Murmure -configuration Release \
+      -derivedDataPath "$BUILD_DIR" -destination 'platform=macOS,arch=arm64' \
+      CODE_SIGNING_ALLOWED=NO MURMURE_INFO_HOME="$MURMURE_HOME" MURMURE_INFO_SOURCE_SUM="$APP_SUM" \
+      build >"$BUILD_LOG" 2>&1 \
+    || { tail -20 "$BUILD_LOG" >&2; fail "compilation de Murmure.app impossible — journal : $BUILD_LOG"; }
   pkill -f "$APP/Contents/MacOS/Murmure" 2>/dev/null || true   # ancienne version
+  pkill -f "$APP/Contents/Helpers/overlay" 2>/dev/null || true   # sa pastille
   # Migration : l'app vivait dans ~/Applications. Seulement pour une
   # installation par défaut — jamais quand MURMURE_APP_DIR vise un autre dossier.
   if [ -z "${MURMURE_APP_DIR:-}" ] && [ "$OLD_APP" != "$APP" ] && [ -d "$OLD_APP" ]; then
@@ -263,11 +262,7 @@ else
   fi
   mkdir -p "$APP_DIR"
   rm -rf "$APP"
-  mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-  cp "$STAGE/Info.plist" "$APP/Contents/Info.plist"
-  cp "$STAGE/Murmure" "$APP/Contents/MacOS/Murmure"
-  cp "$SRC/app/Murmure.icns" "$APP/Contents/Resources/Murmure.icns"
-  chmod +x "$APP/Contents/MacOS/Murmure"
+  ditto "$BUILD_DIR/Build/Products/Release/Murmure.app" "$APP"
   sign_app
   if [ -z "$PREV_SIGNER" ]; then
     note "Murmure.app : créée ($(signed_as))"
@@ -278,6 +273,13 @@ else
     note "Murmure.app : recréée ($(signed_as)) — autorisations conservées"
   fi
   ok "$APP ($VERSION, $(signed_as))"
+fi
+
+# La pastille est dans Murmure.app (Contents/Helpers) : la copie que les
+# versions ≤ 1.1.0 compilaient ici ne sert plus.
+if [ -e "$MURMURE_HOME/overlay" ] || [ -e "$MURMURE_HOME/overlay.sha256" ]; then
+  rm -f "$MURMURE_HOME/overlay" "$MURMURE_HOME/overlay.sha256"
+  note "ancienne pastille de $MURMURE_HOME : retirée (elle est dans Murmure.app)"
 fi
 
 # Règles actives de karabiner.json qui lancent Murmure (« murmure|profil|règle|

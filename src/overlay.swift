@@ -4,9 +4,9 @@ import AppKit
 // Onde animée + libellé + bouton stop + ✕ (annuler). L'état est lu dans un fichier :
 // « recording <durée max> », « transcribing <durée estimée> », « pasting », et sa
 // disparition ferme la fenêtre. Pendant l'écoute, l'onde suit le niveau RMS
-// qu'écrit ffmpeg dans « levels », à côté du fichier d'état, et le libellé
-// devient un compte à rebours à l'approche de la durée max (début de capture
-// lu dans « started »). Pendant la transcription, les points de l'onde
+// qu'écrit l'enregistreur (au format d'ffmpeg) dans « levels », à côté du
+// fichier d'état, et le libellé devient un compte à rebours à l'approche de la
+// durée max (début de capture lu dans « started »). Pendant la transcription, les points de l'onde
 // servent de jauge et s'allument un à un.
 
 let statusPath = CommandLine.arguments.count > 1
@@ -236,7 +236,14 @@ final class Controller: NSObject {
     }
 }
 
-let app = NSApplication.shared
-app.setActivationPolicy(.accessory)
-let controller = Controller()
-app.run()
+// Point d'entrée explicite : Xcode compile un fichier seul qui ne s'appelle
+// pas main.swift comme une bibliothèque, sans code de premier niveau.
+@main
+enum Pastille {
+    static func main() {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        let controller = Controller()
+        withExtendedLifetime(controller) { app.run() }
+    }
+}

@@ -5,11 +5,15 @@
     <key>CFBundleName</key>
     <string>Murmure</string>
     <key>CFBundleIdentifier</key>
-    <string>dev.croustibat.murmure</string>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <!-- Numéro de build entier, augmenté à chaque release : Sparkle compare ce
+         nombre, pas la version affichée. -->
     <key>CFBundleVersion</key>
-    <string>1.0</string>
+    <string>1</string>
+    <!-- Remplacée à la compilation par le contenu de VERSION (phase « Version »
+         de project.yml). -->
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>0.0.0</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
@@ -19,10 +23,16 @@
     <key>LSUIElement</key>
     <true/>
     <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
+    <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Murmure enregistre votre voix pour la transcrire en texte, en local sur votre Mac.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Murmure colle le texte transcrit dans l'application active.</string>
+    <!-- Inscrits par install.sh (dossier d'installation, empreinte des sources),
+         vides pour une compilation de développement. -->
+    <key>MurmureHome</key>
+    <string>$(MURMURE_INFO_HOME)</string>
+    <key>MurmureSourceSum</key>
+    <string>$(MURMURE_INFO_SOURCE_SUM)</string>
 </dict>
 </plist>
