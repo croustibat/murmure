@@ -18,7 +18,7 @@ import Foundation
 //
 // Capture par l'AUHAL de Core Audio plutôt qu'AVAudioEngine ou
 // AVCaptureSession : mesuré du lancement au premier échantillon, ~0,3 s contre
-// ~0,5 s (AVCaptureSession), ~0,8 s (AVAudioEngine) et ~0,7 s pour ffmpeg.
+// ~0,5 s (AVCaptureSession), ~0,8 s (AVAudioEngine) et ~0,6 s pour ffmpeg.
 // Le micro est celui de l'app qui lance murmure.sh : c'est elle, processus
 // responsable, qui porte l'autorisation Micro.
 
