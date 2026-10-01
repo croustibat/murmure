@@ -1,0 +1,7 @@
+# whisper.cpp embarqué dans Murmure.app, lu par scripts/build-whisper.sh.
+# Le commit protège d'une étiquette déplacée après coup : le script refuse de
+# compiler si l'étiquette ne pointe plus dessus.
+# Changer de version : modifier les deux lignes, relancer le script, puis
+# comparer à la version précédente avec scripts/bench.sh (temps et texte).
+WHISPER_TAG=v1.9.4
+WHISPER_COMMIT=927cfce34f31707e17f2bff35c349632fb9e2c3a
