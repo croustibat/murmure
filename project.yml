@@ -30,6 +30,9 @@ targets:
     sources:
       - path: src/app
       - path: app/Murmure.icns
+      # Constantes du modèle Whisper, lues aussi par install.sh.
+      - path: app/modele.conf
+        buildPhase: resources
     settings:
       base:
         PRODUCT_NAME: Murmure

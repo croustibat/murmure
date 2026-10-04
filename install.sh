@@ -8,19 +8,19 @@ APP_DIR="${MURMURE_APP_DIR:-/Applications}"
 OLD_APP="$HOME/Applications/Murmure.app"
 APP="$APP_DIR/Murmure.app"
 KARABINER_DIR="${MURMURE_KARABINER_DIR:-$HOME/.config/karabiner}"
-MODEL_NAME="${MURMURE_MODEL_NAME:-ggml-large-v3-turbo-q5_0.bin}"
-# URL figée sur une révision précise : le hash ci-dessous reste valable même si
-# le dépôt Hugging Face publie une nouvelle version du fichier.
-MODEL_REV="5359861c739e955e79d9a303bcbc70fb988958b1"
-MODEL_URL="${MURMURE_MODEL_URL:-https://huggingface.co/ggerganov/whisper.cpp/resolve/$MODEL_REV/$MODEL_NAME}"
-if [ "$MODEL_NAME" = "ggml-large-v3-turbo-q5_0.bin" ]; then
-  MODEL_SHA256="${MURMURE_MODEL_SHA256:-394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2}"
-  MODEL_SIZE="${MURMURE_MODEL_SIZE:-574041195}"
+SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Nom, révision, empreinte et taille du modèle : app/modele.conf, que
+# Murmure.app lit aussi pour le télécharger elle-même.
+modele() { sed -n "s/^$1=//p" "$SRC/app/modele.conf" | tail -1 | tr -d '[:space:]'; }
+MODEL_NAME="${MURMURE_MODEL_NAME:-$(modele MODEL_NAME)}"
+MODEL_URL="${MURMURE_MODEL_URL:-$(modele MODEL_REPO)/$(modele MODEL_REV)/$MODEL_NAME}"
+if [ "$MODEL_NAME" = "$(modele MODEL_NAME)" ]; then
+  MODEL_SHA256="${MURMURE_MODEL_SHA256:-$(modele MODEL_SHA256)}"
+  MODEL_SIZE="${MURMURE_MODEL_SIZE:-$(modele MODEL_SIZE)}"
 else
   MODEL_SHA256="${MURMURE_MODEL_SHA256:-}"
   MODEL_SIZE="${MURMURE_MODEL_SIZE:-}"
 fi
-SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 VERIFY=0
 for arg in "$@"; do
