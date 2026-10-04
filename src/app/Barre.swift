@@ -22,6 +22,7 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var enfonce = false   // touche du raccourci actuellement enfoncée
     private var surveillance: DispatchSourceFileSystemObject?
     private var releve: Timer?
+    private let modele = Modele()
     private lazy var reglages = FenetreReglages(suspendreRaccourci: { [unowned self] in raccourcis.retirer(Barre.idDictee) },
                                                 appliquerRaccourci: { [unowned self] in enregistrerRaccourci() })
 
@@ -35,6 +36,7 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         misesAJour.demarrer()
         autorisations.changement = { [weak self] in self?.dessinerIcone() }
         autorisations.demarrer()
+        modele.demarrer()
     }
 
     private func construireMenu() {
@@ -59,6 +61,9 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.autoenablesItems = false
         menu.delegate = self
         item.menu = menu
+        // En tête, avant tout le reste : le modèle à télécharger.
+        menu.insertItem(modele.separateur, at: 0)
+        menu.insertItem(modele.ligne, at: 0)
     }
 
     // MURMURE_SHORTCUT (environnement ou config), sinon ⌘⇧E.
@@ -89,6 +94,8 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard appuye != enfonce else { return }
             enfonce = appuye
         }
+        // Sans modèle, le raccourci ouvre la fenêtre de téléchargement.
+        if id == Barre.idDictee, appuye, modele.manquant { modele.montrer(); return }
         switch (id, appuye) {
         case (Barre.idDictee, true): lancer("press") { self.lireEtat() }
         case (Barre.idDictee, false): lancer("release") { self.lireEtat() }
@@ -166,7 +173,10 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         lireEtat()
     }
 
-    @objc private func basculer() { lancer("toggle") { self.lireEtat() } }
+    @objc private func basculer() {
+        if modele.manquant { modele.montrer(); return }
+        lancer("toggle") { self.lireEtat() }
+    }
 
     @objc private func changerDemarrage() {
         do {
