@@ -57,11 +57,9 @@ sha256() { shasum -a 256 "$1" | cut -d' ' -f1; }
 
 step "Vérification des dépendances"
 command -v brew >/dev/null || fail "Homebrew est requis : https://brew.sh"
-command -v ffmpeg  >/dev/null || { step "Installation de ffmpeg";  brew install ffmpeg; }
 command -v whisper-cli >/dev/null || { step "Installation de whisper.cpp"; brew install whisper-cpp; }
-command -v ffmpeg >/dev/null     || fail "ffmpeg introuvable après installation."
 command -v whisper-cli >/dev/null || fail "whisper-cli introuvable après installation."
-ok "ffmpeg et whisper-cli présents"
+ok "whisper-cli présent"
 # Murmure.app se compile avec Xcode, à partir du projet que XcodeGen génère
 # depuis project.yml.
 xcodebuild -version >/dev/null 2>&1 \
@@ -158,7 +156,7 @@ step "Création de Murmure.app"
 VERSION="$(tr -d '[:space:]' < "$SRC/VERSION")"
 # Ce que project.yml compile, copie ou signe dans le bundle : un nouvel outil
 # de Contents/Helpers y ajoute ses sources.
-APP_SOURCES=(project.yml VERSION app src/app src/overlay.swift script/sign_app.sh)
+APP_SOURCES=(project.yml VERSION app src/app src/overlay.swift src/rec script/sign_app.sh)
 APP_SUM="$( { (cd "$SRC" && find "${APP_SOURCES[@]}" -type f ! -name .DS_Store -print0 \
   | LC_ALL=C sort -z | xargs -0 shasum -a 256); xcodebuild -version; } | shasum -a 256 | cut -d' ' -f1)"
 # Hors des dossiers synchronisés par iCloud, comme script/build_and_run.sh.
