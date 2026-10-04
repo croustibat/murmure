@@ -300,8 +300,15 @@ erreur. Whisper, n'entendant rien, invente alors des génériques de sous-titres
 
 ## Réseau
 
-La transcription ne quitte jamais votre Mac. Murmure fait une seule requête réseau :
-**au plus une fois par jour** (et quand vous choisissez « Rechercher les mises à
+La transcription ne quitte jamais votre Mac. Murmure fait exactement deux requêtes
+réseau.
+
+**Le modèle, une seule fois** : au premier lancement, l'app télécharge
+`ggml-large-v3-turbo-q5_0.bin` (~550 Mo) depuis une révision figée du dépôt Hugging Face
+`ggerganov/whisper.cpp`, puis vérifie son empreinte SHA-256. Rien n'est envoyé ; une fois
+le modèle en place, plus aucune requête n'est nécessaire pour dicter.
+
+**Les mises à jour, au plus une fois par jour** (et quand vous choisissez « Rechercher les mises à
 jour… »), l'app lit la dernière version publiée sur
 `https://api.github.com/repos/croustibat/murmure/releases/latest`. C'est une simple
 lecture d'une page publique : aucune donnée n'est envoyée, ni texte, ni audio, ni
