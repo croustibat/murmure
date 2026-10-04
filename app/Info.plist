@@ -4,6 +4,10 @@
 <dict>
     <key>CFBundleName</key>
     <string>Murmure</string>
+    <!-- Langue de l'app, que suivent les frameworks : sans elle, les fenêtres
+         de Sparkle s'affichent en anglais. -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleIdentifier</key>
     <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
     <!-- Numéro de build entier, augmenté à chaque release : Sparkle compare ce
@@ -28,6 +32,22 @@
     <string>Murmure enregistre votre voix pour la transcrire en texte, en local sur votre Mac.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Murmure colle le texte transcrit dans l'application active.</string>
+    <!-- Mises à jour Sparkle. L'appcast est un asset de chaque release : le
+         lien « latest » reste stable. Les archives qu'il décrit portent la
+         signature de la clé EdDSA du compte « murmure » du trousseau
+         (sign_update --account murmure). -->
+    <key>SUFeedURL</key>
+    <string>https://github.com/croustibat/murmure/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>m/oMIt5Y30RigvFT0vNwSyUBlEtvWKqzUnxEuoFxitA=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
+    <!-- Aucun profil du Mac (modèle, langue, version de macOS) joint à la
+         requête de l'appcast. -->
+    <key>SUEnableSystemProfiling</key>
+    <false/>
     <!-- Inscrits par install.sh (dossier d'installation, empreinte des sources),
          vides pour une compilation de développement. -->
     <key>MurmureHome</key>
