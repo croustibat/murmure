@@ -6,8 +6,8 @@ Un raccourci, vous parlez, le texte s'écrit dans l'application active.
 ![Murmure en écoute](docs/apercu-ecoute.png)
 
 Pas de compte, pas d'abonnement, pas de clé API, aucune donnée qui sort de votre Mac
-(la seule requête réseau lit le numéro de la dernière version publiée, voir
-[Réseau](#réseau)).
+(deux requêtes réseau seulement : le téléchargement unique du modèle et la vérification
+des mises à jour, voir [Réseau](#réseau)).
 Votre voix est transcrite par [whisper.cpp](https://github.com/ggerganov/whisper.cpp)
 tournant en local.
 
