@@ -10,17 +10,32 @@ set -uo pipefail
 # l'UTF-8 en MacRoman et « Société » devient « Soci√©t√© ».
 export LANG="${LANG:-fr_FR.UTF-8}"
 export LC_ALL="${LC_ALL:-fr_FR.UTF-8}"
-export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+# Outils du système seulement : whisper-cli, l'enregistreur et la pastille
+# viennent du bundle, perl est celui de macOS.
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin"
 
 MURMURE_HOME="${MURMURE_HOME:-$HOME/.local/share/murmure}"
+
+# Le moteur vit dans Murmure.app (Contents/Resources/engine), ses outils à
+# côté (Contents/Helpers) : une mise à jour de l'app met tout à jour ensemble.
+# Lancé hors d'un bundle (depuis les sources), il prend les outils de l'app
+# désignée par MURMURE_APP, sinon de /Applications/Murmure.app.
+ENGINE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+IN_BUNDLE=0
+case "$ENGINE" in
+  */Contents/Resources/engine) CONTENTS="${ENGINE%/Resources/engine}"; IN_BUNDLE=1 ;;
+  *) CONTENTS="${MURMURE_APP:-/Applications/Murmure.app/Contents/MacOS/Murmure}"; CONTENTS="${CONTENTS%/MacOS/*}" ;;
+esac
+SELF="$ENGINE/${BASH_SOURCE[0]##*/}"
 
 # Réglages lus dans $MURMURE_HOME/config : le raccourci ne transmet aucune
 # variable d'environnement. Lignes « CLE=valeur », jamais exécutées (pas de
 # source) : seules les clés connues sont retenues, et une variable
 # d'environnement l'emporte sur le fichier. MURMURE_SHORTCUT, lue par l'app,
-# est acceptée mais ignorée ici.
+# est acceptée mais ignorée ici. MURMURE_WHISPER remplace le whisper-cli du
+# bundle (une autre version, par exemple).
 CONFIG="$MURMURE_HOME/config"
-CONFIG_KEYS=" MURMURE_LANG MURMURE_DEVICE MURMURE_MAX MURMURE_SILENCE_DB MURMURE_HOLD_MS MURMURE_WHISPER_ARGS MURMURE_SHORTCUT MURMURE_HISTORY MURMURE_RESTORE_CLIPBOARD MURMURE_CHECK_UPDATES "
+CONFIG_KEYS=" MURMURE_LANG MURMURE_DEVICE MURMURE_MAX MURMURE_SILENCE_DB MURMURE_HOLD_MS MURMURE_WHISPER_ARGS MURMURE_SHORTCUT MURMURE_HISTORY MURMURE_RESTORE_CLIPBOARD MURMURE_CHECK_UPDATES MURMURE_WHISPER "
 CONFIG_NOTES=()   # anomalies, journalisées une fois le journal disponible
 load_config() {
   [ -r "$CONFIG" ] || return 0
@@ -56,7 +71,7 @@ load_config
 
 MODEL_NAME="${MURMURE_MODEL_NAME:-ggml-large-v3-turbo-q5_0.bin}"
 
-WHISPER_BIN="${MURMURE_WHISPER:-/opt/homebrew/bin/whisper-cli}"
+WHISPER_BIN="${MURMURE_WHISPER:-$CONTENTS/Helpers/whisper-cli}"
 # MURMURE_FFMPEG (chemin d'ffmpeg) rétablit l'ancien enregistrement à la
 # place de murmure-rec, le temps de la transition.
 FFMPEG_BIN="${MURMURE_FFMPEG:-}"
@@ -68,7 +83,7 @@ MIN_BYTES="${MURMURE_MIN_BYTES:-48000}"   # ~1,5 s à 16 kHz mono 16 bits
 SILENCE_DB="${MURMURE_SILENCE_DB:--70}"   # en dessous : rien n'a été capté
 PROMPT_FILE="${MURMURE_PROMPT_FILE:-$MURMURE_HOME/vocabulaire.txt}"
 CORRECTIONS="${MURMURE_CORRECTIONS:-$MURMURE_HOME/corrections.txt}"
-CORRIGER="${MURMURE_CORRIGER:-$MURMURE_HOME/corriger.pl}"
+CORRIGER="${MURMURE_CORRIGER:-$ENGINE/corriger.pl}"
 CADENCE="${MURMURE_CADENCE:-$MURMURE_HOME/cadence}"   # vitesse mesurée de la machine
 # Options ajoutées à whisper-cli (ex. « -bs 1 -bo 1 »). Vide par défaut : aucune
 # option mesurée par scripts/bench.sh n'accélère une dictée courte d'au moins 10 %
@@ -89,9 +104,9 @@ LOG_MAX="${MURMURE_LOG_MAX:-1048576}"   # au-delà, murmure.log devient murmure.
 HOLD_MS="${MURMURE_HOLD_MS:-600}" # au-delà, relâcher la touche arrête la capture
 HISTORIQUE="$MURMURE_HOME/historique.jsonl"   # dernières dictées, lues par le menu
 RESTORE_CLIPBOARD="${MURMURE_RESTORE_CLIPBOARD:-0}"
-APP_BIN="${MURMURE_APP:-/Applications/Murmure.app/Contents/MacOS/Murmure}"
-OVERLAY="${MURMURE_OVERLAY:-${APP_BIN%/MacOS/*}/Helpers/overlay}"   # pastille, dans le bundle
-REC_BIN="${MURMURE_REC:-${APP_BIN%/MacOS/*}/Helpers/murmure-rec}"   # enregistreur (src/rec), dans le bundle
+APP_BIN="${MURMURE_APP:-$CONTENTS/MacOS/Murmure}"
+OVERLAY="${MURMURE_OVERLAY:-$CONTENTS/Helpers/overlay}"   # pastille, dans le bundle
+REC_BIN="${MURMURE_REC:-$CONTENTS/Helpers/murmure-rec}"   # enregistreur (src/rec), dans le bundle
 CLIP_SAVE="$STATE_DIR/presse-papiers"   # contenu d'origine, le temps du collage
 REFUSED="$STATE_DIR/collage-refuse"   # ⌘V refusé par macOS : l'app propose une relance
 mkdir -p "$STATE_DIR"
@@ -228,7 +243,7 @@ start_recording() {
   echo $pid >"$PID_FILE"
   printf 'recording %s' "$MAX_SECONDS" >"$STATUS"   # durée max : compte à rebours
   pkill -f "$OVERLAY" 2>/dev/null
-  [ -x "$OVERLAY" ] && nohup "$OVERLAY" "$STATUS" "$MURMURE_HOME/murmure.sh" \
+  [ -x "$OVERLAY" ] && nohup "$OVERLAY" "$STATUS" "$SELF" \
       >>"$LOG" 2>&1 &
   # L'enregistreur s'arrête seul à la limite : on transcrit alors comme sur un
   # second appui. Après un arrêt ou une annulation, expire ne trouve plus la
@@ -317,6 +332,21 @@ add_history() {
     print $out @l; close $out or die "$f.$$ : $!\n";
     rename "$f.$$", $f or die "$f : $!\n";
   ' "$HISTORIQUE" 2>>"$LOG" || log "historique : écriture impossible"
+}
+
+# Copies du moteur que les versions ≤ 1.1.0 installaient dans $MURMURE_HOME :
+# ignorées depuis que le moteur est dans le bundle, et retirées seulement
+# après une dictée réussie avec lui. Jusque-là, revenir à l'ancienne app
+# fonctionne encore.
+retirer_ancien_moteur() {
+  [ "$IN_BUNDLE" = 1 ] || return 0
+  local f anciens=()
+  for f in murmure.sh corriger.pl overlay overlay.sha256; do
+    [ -e "$MURMURE_HOME/$f" ] && anciens+=("$f")
+  done
+  [ ${#anciens[@]} -gt 0 ] || return 0
+  (cd "$MURMURE_HOME" && rm -f "${anciens[@]}") \
+    && log "ancien moteur retiré de $MURMURE_HOME : ${anciens[*]}"
 }
 
 stop_and_transcribe() {
@@ -421,6 +451,7 @@ stop_and_transcribe() {
   fi
   rm -f "$STATUS" "$TARGET"
   add_history "$text" "$bytes" "$bundle"   # après le collage : ne pas le retarder
+  retirer_ancien_moteur
 }
 
 # Annulation : on coupe l'écoute, rien n'est transcrit ni collé.

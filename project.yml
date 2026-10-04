@@ -30,6 +30,28 @@ targets:
     sources:
       - path: src/app
       - path: app/Murmure.icns
+      # Moteur et réglages par défaut dans le bundle : une mise à jour de l'app
+      # met aussi le moteur à jour. $MURMURE_HOME ne garde que les données de
+      # l'utilisateur ; l'app y dépose les réglages par défaut s'ils manquent.
+      - path: src/murmure.sh
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: engine
+      - path: src/corriger.pl
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: engine
+      - path: config
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: defaults
+      # Licences des composants embarqués (whisper.cpp) : Contents/Resources/Licences.
+      - path: app/Licences
+        type: folder
+        buildPhase: resources
     settings:
       base:
         PRODUCT_NAME: Murmure
@@ -59,6 +81,21 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+    # whisper-cli n'est pas une cible : CMake le compile (scripts/build-whisper.sh,
+    # lancé par install.sh et script/build_and_run.sh avant xcodebuild). Copié
+    # par un script plutôt que déclaré en source, pour un message clair s'il
+    # manque.
+    postCompileScripts:
+      - name: whisper-cli dans Contents/Helpers
+        basedOnDependencyAnalysis: false
+        script: |
+          src="$SRCROOT/build/whisper/whisper-cli"
+          if [ ! -x "$src" ]; then
+            echo "error: build/whisper/whisper-cli manquant : lancez scripts/build-whisper.sh"
+            exit 1
+          fi
+          mkdir -p "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
+          cp -p "$src" "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/whisper-cli"
     postBuildScripts:
       # VERSION reste la seule source du numéro affiché. L'Info.plist produit
       # en entrée ordonne la phase après son traitement par Xcode.

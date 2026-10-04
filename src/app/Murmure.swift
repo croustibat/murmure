@@ -12,14 +12,17 @@ import AppKit
 
 let commandes: Set<String> = ["toggle", "press", "release", "cancel"]
 
-// Dossier d'installation : variable d'environnement, sinon celui inscrit par
-// install.sh dans Info.plist, sinon l'emplacement par défaut.
+// Données de l'utilisateur : variable d'environnement, sinon le dossier
+// inscrit par install.sh dans Info.plist, sinon l'emplacement par défaut.
 let murmureHome: String = {
     if let h = ProcessInfo.processInfo.environment["MURMURE_HOME"], !h.isEmpty { return h }
     if let h = Bundle.main.object(forInfoDictionaryKey: "MurmureHome") as? String, !h.isEmpty { return h }
     return NSString(string: "~/.local/share/murmure").expandingTildeInPath
 }()
-let script = murmureHome + "/murmure.sh"
+// Le moteur est dans le bundle : il se met à jour avec l'app. Il trouve seul
+// les outils de Contents/Helpers ; la config ou l'environnement peuvent les
+// remplacer (MURMURE_WHISPER…).
+let script = (Bundle.main.resourcePath ?? "") + "/engine/murmure.sh"
 let stateDir = ProcessInfo.processInfo.environment["MURMURE_STATE_DIR"].flatMap { $0.isEmpty ? nil : $0 }
     ?? "/tmp/murmure-\(getuid())"
 let statusPath = stateDir + "/status"
@@ -79,6 +82,8 @@ enum Principal {
         // Au lancement par LaunchServices, macOS peut ajouter « -psn_… ».
         let args = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-psn_") }
         try? FileManager.default.createDirectory(atPath: stateDir, withIntermediateDirectories: true)
+        // Avant toute dictée, y compris lancée par « open -n … --args press ».
+        if args.first.map(commandes.contains) ?? true { Donnees.preparer() }
 
         if let cmd = args.first, commandes.contains(cmd) {
             // Mode compatibilité : le script remplace ce processus, qui reste

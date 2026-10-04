@@ -37,6 +37,9 @@ fi
 
 command -v xcodegen >/dev/null || { echo "XcodeGen est requis : brew install xcodegen" >&2; exit 1; }
 xcodegen generate --quiet
+# whisper-cli, compilé à part (CMake), est copié dans Contents/Helpers par
+# xcodebuild : quelques secondes s'il est déjà à jour.
+scripts/build-whisper.sh
 mkdir -p "$BUILD_DIR"
 echo "▸ Compilation de Murmure…"
 if ! xcodebuild -project Murmure.xcodeproj -scheme Murmure -configuration Debug \
