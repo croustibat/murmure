@@ -236,7 +236,14 @@ final class Controller: NSObject {
     }
 }
 
-let app = NSApplication.shared
-app.setActivationPolicy(.accessory)
-let controller = Controller()
-app.run()
+// Point d'entrée explicite : Xcode compile un fichier seul qui ne s'appelle
+// pas main.swift comme une bibliothèque, sans code de premier niveau.
+@main
+enum Pastille {
+    static func main() {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        let controller = Controller()
+        withExtendedLifetime(controller) { app.run() }
+    }
+}
