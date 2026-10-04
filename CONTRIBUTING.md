@@ -33,6 +33,12 @@ par `murmure.sh` : aujourd'hui la pastille (`overlay`, `src/overlay.swift`). Il 
 sous runtime durci, avec deux entitlements (`app/Murmure.entitlements`) :
 `com.apple.security.device.audio-input` (sans lui, le micro rend un flux muet) et
 `com.apple.security.automation.apple-events` (le ⌘V passe par System Events).
+`Contents/Frameworks/Sparkle.framework` (mises à jour) est re-signé par
+`script/sign_app.sh` avec la même identité, ses services XPC (inutiles hors bac à
+sable) retirés. Signée ad hoc (sans certificat, ou par Xcode seul), l'app reçoit en plus
+`com.apple.security.cs.disable-library-validation` (`app/Murmure-adhoc.entitlements`) :
+sans équipe, le runtime durci refuserait de charger Sparkle. Jamais avec un certificat,
+où toute bibliothèque chargée hériterait des autorisations de Murmure.
 
 ```bash
 codesign -d --entitlements - Murmure.app   # les deux entitlements
@@ -51,15 +57,17 @@ compilation (phase « Version » de `project.yml`) ; `CFBundleVersion`, dans
 
 ## Publier une version
 
-Les versions sont des **GitHub Releases** étiquetées `vX.Y.Z`. `Murmure.app` lit la
-dernière (`/repos/croustibat/murmure/releases/latest`) au plus une fois par jour et
-la compare à son propre numéro, tiré du fichier `VERSION` à la compilation
-(`CFBundleShortVersionString`). Une release plus récente fait apparaître « Version
-X.Y.Z disponible » dans le menu, qui ouvre sa page.
+Les versions sont des **GitHub Releases** étiquetées `vX.Y.Z`. `Murmure.app` se met à
+jour avec Sparkle : au plus une fois par jour, elle lit `appcast.xml`, asset de la
+dernière release (`SUFeedURL` : `releases/latest/download/appcast.xml`, lien stable).
+Sparkle compare le `sparkle:version` de l'appcast au `CFBundleVersion` de l'app : seul
+un nombre plus grand propose la mise à jour. L'archive doit porter la signature EdDSA
+de la clé du compte `murmure` du trousseau (`sign_update --account murmure`), dont la
+clé publique est `SUPublicEDKey`, et la même signature Developer ID que l'app installée.
 
-L'app ne voit que les releases publiées : ni un simple tag, ni un brouillon, ni une
-pré-version ne la déclenchent. La comparaison est numérique (`1.10.0` > `1.9.2`), le
-`v` initial est retiré.
+L'app ne voit que la release « latest » : ni un simple tag, ni un brouillon, ni une
+pré-version ne la déclenchent. Une release sans `appcast.xml` n'est pas vue (le journal
+note l'erreur).
 
 1. Mettre à jour `VERSION` sur `main` (`1.2.0`, sans `v`) :
    - correctif : `1.1.0` → `1.1.1` ;
@@ -91,8 +99,8 @@ pré-version ne la déclenchent. La comparaison est numérique (`1.10.0` > `1.9.
    `v1.2.0` pour un `VERSION` resté à `1.1.0` signalerait la mise à jour indéfiniment,
    même après `./install.sh`.
 
-4. Les notes de release disent quoi faire, puisque rien n'est installé
-   automatiquement. Modèle de `notes.md` :
+4. Les notes de release disent quoi faire aux versions ≤ 1.1.0, qui ne se mettent
+   pas à jour seules. Modèle de `notes.md` :
 
    ```markdown
    ## Nouveautés
@@ -108,16 +116,29 @@ pré-version ne la déclenchent. La comparaison est numérique (`1.10.0` > `1.9.
    Accessibilité.
    ```
 
-La vérification se teste sans rien publier, avec un faux JSON servi en local
-(`MURMURE_RELEASES_URL` remplace l'adresse de l'API). Quitter d'abord Murmure : une
-seule instance tourne à la fois.
+La mise à jour se teste sans rien publier ni toucher au trousseau, à côté de l'app
+installée :
 
 ```bash
-mkdir -p /tmp/rel && echo '{"tag_name":"v9.9.9","html_url":"https://github.com/croustibat/murmure/releases"}' > /tmp/rel/latest
-(cd /tmp/rel && python3 -m http.server 8765) &
-rm -f ~/.local/share/murmure/.mises-a-jour   # oublie la vérification du jour
-MURMURE_RELEASES_URL=http://127.0.0.1:8765/latest /Applications/Murmure.app/Contents/MacOS/Murmure
+script/essai_mise_a_jour.sh /private/tmp/murmure-essai
 ```
 
-`$MURMURE_HOME/.mises-a-jour` garde la date de la dernière requête et la version
-trouvée ; le supprimer autorise une nouvelle vérification immédiate.
+Le script compile deux builds de test (1.2.0, build 2 ; 1.2.1, build 3), met la seconde
+en DMG dans un appcast signé par une clé EdDSA jetable, et installe la première dans
+`/private/tmp/murmure-essai/Applications`. Leur Info.plist porte le flux local, la clé
+de test et (`LSEnvironment`, qui survit à la relance par Sparkle) un `MURMURE_HOME` et un
+dossier d'état à part. Servir l'appcast et ouvrir l'app (commandes affichées) : Sparkle
+propose la 1.2.1, l'installe et relance l'app, ce que dit le journal de l'essai. Pour
+vérifier qu'une dictée diffère l'installation, simuler une transcription avant
+« Installer et relancer », puis la terminer :
+
+```bash
+printf 'transcribing 30' > /tmp/s && mv /tmp/s /private/tmp/murmure-essai/etat/status
+rm /private/tmp/murmure-essai/etat/status
+```
+
+Sparkle range la date de sa dernière vérification dans les réglages de
+`dev.croustibat.murmure` : `defaults delete dev.croustibat.murmure SULastCheckTime`
+autorise une nouvelle vérification au lancement. Après l'essai,
+`script/essai_mise_a_jour.sh /private/tmp/murmure-essai --nettoyer` retire ces réglages
+et le dossier.
