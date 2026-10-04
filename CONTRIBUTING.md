@@ -86,6 +86,36 @@ Numéros de version : `CFBundleShortVersionString` est lu dans `VERSION` à la
 compilation (phase « Version » de `project.yml`) ; `CFBundleVersion`, dans
 `app/Info.plist`, est un entier augmenté de 1 à chaque release, que Sparkle compare.
 
+## Tester le téléchargement du modèle
+
+Sans modèle, l'app le télécharge elle-même (`src/app/Modele.swift`). Son nom, sa
+révision, son empreinte et sa taille sont dans `app/modele.conf`, seule source, lue
+aussi par `install.sh`. Pour essayer sans tirer 550 Mo ni toucher à l'installation :
+un faux modèle, servi par `scripts/serveur-modele.py` (reprise, débit limité, coupure
+simulée), et un build lancé à côté avec un dossier vide.
+
+```bash
+head -c 8388608 /dev/urandom > /tmp/faux.bin
+scripts/serveur-modele.py /tmp/faux.bin --debit 1000000 --couper 3000000 &
+MURMURE_HOME=/tmp/murmure-essai MURMURE_STATE_DIR=/tmp/murmure-essai-etat \
+  MURMURE_SHORTCUT=ctrl+alt+shift+cmd+f19 \
+  MURMURE_MODEL_URL=http://127.0.0.1:8770/redirection MURMURE_MODEL_SIZE=8388608 \
+  MURMURE_MODEL_SHA256="$(shasum -a 256 /tmp/faux.bin | cut -d' ' -f1)" \
+  script/build_and_run.sh
+```
+
+La première connexion est coupée à 3 Mo : « Réessayer » reprend là où elle s'est
+arrêtée, le serveur journalise chaque plage demandée. Un octet modifié dans le `.part`
+avant de reprendre (`printf '\xff' | dd of=<fichier>.part bs=1 seek=1000 conv=notrunc`)
+fait refuser le fichier reçu, puis le retélécharger en entier.
+
+L'app retient dans `$MURMURE_HOME/.modele-verifie` l'empreinte déjà vérifiée d'un
+modèle présent, et dans `.prechauffage` la version de whisper-cli déjà préchauffée :
+supprimer ce fichier relance le préchauffage au prochain lancement. Le cache Metal de
+macOS ne vaut que pour une même version de whisper-cli lancée de la même façon ; pour
+mesurer un premier lancement à froid, il faut une whisper-cli dont la source Metal
+embarquée diffère.
+
 ## Publier une version
 
 Les versions sont des **GitHub Releases** étiquetées `vX.Y.Z`. `Murmure.app` se met à
