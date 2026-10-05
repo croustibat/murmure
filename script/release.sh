@@ -286,8 +286,9 @@ codesign --verify --strict "$DMG"
 
 if [ "$NOTARIZE" = 1 ]; then
     echo "▸ Notarisation Apple (quelques minutes)…"
-    SUBMISSION="$(xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait 2>&1)" || true
-    echo "$SUBMISSION"
+    xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait 2>&1 \
+        | tee "$STAGING/notarisation.log" || true
+    SUBMISSION="$(cat "$STAGING/notarisation.log")"
     if ! grep -q "status: Accepted" <<<"$SUBMISSION"; then
         SUBMISSION_ID="$(sed -n 's/^ *id: \([0-9a-f-]*\)$/\1/p' <<<"$SUBMISSION" | head -1)"
         [ -n "$SUBMISSION_ID" ] && xcrun notarytool log "$SUBMISSION_ID" --keychain-profile "$NOTARY_PROFILE" >&2
