@@ -12,3 +12,6 @@ export const codes: Record<Langue, { html: string; og: string }> = {
 };
 
 export const depot = 'https://github.com/croustibat/murmure';
+// Lien stable : l'asset Murmure.dmg de la dernière release.
+export const dmg = `${depot}/releases/latest/download/Murmure.dmg`;
+export const cask = 'brew install --cask croustibat/tap/murmure';
