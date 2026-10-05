@@ -73,7 +73,7 @@ if [ -x "$APP/Contents/MacOS/Murmure" ] && [ -z "$(info_of "$APP" MurmureSourceS
         echo "      Installée par Homebrew : brew uninstall --cask murmure d'abord."
       fi
       printf '    Remplacer par la build locale ? [o/N] '
-      read -r answer || answer=""
+      read -r answer || { answer=""; echo; }   # sans réponse (pas de terminal) : non
       case "$answer" in [oO]*) ;; *) echo "    Rien n'a été modifié."; exit 0 ;; esac
       note "Murmure.app : version publiée remplacée par la build locale"
       ;;
