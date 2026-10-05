@@ -281,7 +281,7 @@ ditto "$APP" "$STAGING/dmg/Murmure.app"
 ln -s /Applications "$STAGING/dmg/Applications"
 rm -f "$DMG"
 hdiutil create -volname Murmure -srcfolder "$STAGING/dmg" -fs HFS+ -format UDZO -quiet "$DMG"
-codesign --force --sign "$SIGN_HASH" --timestamp "$DMG"
+codesign --force --sign "$SIGN_HASH" --timestamp --identifier dev.croustibat.murmure.dmg "$DMG"
 codesign --verify --strict "$DMG"
 
 if [ "$NOTARIZE" = 1 ]; then
@@ -302,6 +302,11 @@ else
     # Sans notarisation, Gatekeeper doit refuser l'app pour cette seule raison.
     spctl --assess --type execute --verbose "$APP" 2>&1 | sed 's/^/  Gatekeeper : /' || true
 fi
+# Xcode inscrit l'app compilée (et Updater.app de Sparkle) auprès de
+# LaunchServices : plus récente que l'app installée, elle pourrait être
+# choisie à sa place pour l'identifiant. Le DMG est fait, elle sort du registre.
+find "$APP" -name '*.app' -type d -exec \
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u {} \; 2>/dev/null || true
 
 # Nouveautés : la section « ## X.Y.Z » de CHANGELOG.md, rédigée pour les
 # utilisateurs ; à défaut, les sujets des commits depuis la version précédente.
@@ -367,7 +372,7 @@ cp "$DMG" "$DIST/Murmure.dmg"
     echo
     echo "## Installation"
     echo
-    echo "Ouvrez \`Murmure.dmg\` et glissez Murmure dans Applications. Au premier lancement, Murmure télécharge son modèle de transcription (550 Mo, une seule fois)."
+    echo "Ouvrez \`Murmure.dmg\` et glissez Murmure dans Applications. Au premier lancement, Murmure télécharge son modèle de transcription (550 Mo, une seule fois) s'il n'est pas déjà sur le Mac."
     echo
     echo "Mac avec puce Apple, macOS 14 ou ultérieur. App signée et notarisée par Apple : elle s'ouvre sans avertissement. Elle se met ensuite à jour d'elle-même (menu « Rechercher les mises à jour… »)."
     echo
