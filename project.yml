@@ -57,6 +57,8 @@ targets:
       # Licences des composants embarqués (whisper.cpp) : Contents/Resources/Licences.
       - path: app/Licences
         type: folder
+      # Constantes du modèle Whisper, lues aussi par install.sh.
+      - path: app/modele.conf
         buildPhase: resources
     settings:
       base:

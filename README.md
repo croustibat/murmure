@@ -6,8 +6,8 @@ Un raccourci, vous parlez, le texte s'écrit dans l'application active.
 ![Murmure en écoute](docs/apercu-ecoute.png)
 
 Pas de compte, pas d'abonnement, pas de clé API, aucune donnée qui sort de votre Mac
-(la seule requête réseau lit le numéro de la dernière version publiée, voir
-[Réseau](#réseau)).
+(deux requêtes réseau seulement : le téléchargement unique du modèle et la vérification
+des mises à jour, voir [Réseau](#réseau)).
 Votre voix est transcrite par [whisper.cpp](https://github.com/ggerganov/whisper.cpp)
 tournant en local.
 
@@ -307,9 +307,16 @@ erreur. Whisper, n'entendant rien, invente alors des génériques de sous-titres
 
 ## Réseau
 
-La transcription ne quitte jamais votre Mac. Murmure fait une seule requête réseau :
-**au plus une fois par jour** (et quand vous choisissez « Rechercher les mises à
-jour… »), l'app lit la liste des versions publiées,
+La transcription ne quitte jamais votre Mac. Murmure fait exactement deux requêtes
+réseau.
+
+**Le modèle, une seule fois** : au premier lancement, l'app télécharge
+`ggml-large-v3-turbo-q5_0.bin` (~550 Mo) depuis une révision figée du dépôt Hugging Face
+`ggerganov/whisper.cpp`, puis vérifie son empreinte SHA-256. Rien n'est envoyé ; une fois
+le modèle en place, plus aucune requête n'est nécessaire pour dicter.
+
+**Les mises à jour, au plus une fois par jour** (et quand vous choisissez « Rechercher les
+mises à jour… ») : l'app lit la liste des versions publiées,
 `https://github.com/croustibat/murmure/releases/latest/download/appcast.xml`, avec
 [Sparkle](https://sparkle-project.org). C'est une simple lecture d'un fichier public :
 aucune donnée n'est envoyée, ni texte, ni audio, ni identifiant, ni profil de votre Mac
