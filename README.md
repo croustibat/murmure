@@ -121,10 +121,12 @@ Commandes : `toggle` (bascule), `press` à l'appui et `release` au relâchement
 L'icône de la barre des menus change pendant l'écoute et la transcription. Son menu
 donne l'état et le raccourci, démarre ou arrête une dictée, ouvre le journal, affiche
 la version, et propose **Ouvrir au démarrage** pour lancer Murmure à l'ouverture de
-session. **Rechercher les mises à jour…** interroge GitHub sur-le-champ ; quand une
-version plus récente est publiée, l'entrée **Version X.Y.Z disponible** apparaît au-dessus
-du numéro de version et ouvre la page de la release. Rien n'est téléchargé ni installé
-automatiquement. Murmure ne garde aucun modèle en mémoire entre deux dictées.
+session. **Rechercher les mises à jour…** interroge GitHub sur-le-champ (Murmure le
+fait aussi seule, une fois par jour) ; une version plus récente s'installe en un clic,
+puis Murmure redémarre. Jamais au milieu d'une dictée : l'installation attend la fin de
+la transcription, et une version trouvée pendant une dictée est signalée par l'entrée
+**Version X.Y.Z disponible…** plutôt que par une fenêtre. Murmure ne garde aucun modèle
+en mémoire entre deux dictées.
 
 **Dernières dictées** liste les 10 plus récentes, avec leur heure ; un clic copie le
 texte dans le presse-papiers, pratique quand le collage a échoué ou pour réutiliser
@@ -307,12 +309,15 @@ erreur. Whisper, n'entendant rien, invente alors des génériques de sous-titres
 
 La transcription ne quitte jamais votre Mac. Murmure fait une seule requête réseau :
 **au plus une fois par jour** (et quand vous choisissez « Rechercher les mises à
-jour… »), l'app lit la dernière version publiée sur
-`https://api.github.com/repos/croustibat/murmure/releases/latest`. C'est une simple
-lecture d'une page publique : aucune donnée n'est envoyée, ni texte, ni audio, ni
-identifiant. GitHub ne reçoit que ce que porte toute requête web : votre adresse IP, et
-le numéro de version de Murmure dans l'en-tête `User-Agent`. Hors ligne ou
-en cas d'erreur, rien ne s'affiche ; le journal en garde une ligne.
+jour… »), l'app lit la liste des versions publiées,
+`https://github.com/croustibat/murmure/releases/latest/download/appcast.xml`, avec
+[Sparkle](https://sparkle-project.org). C'est une simple lecture d'un fichier public :
+aucune donnée n'est envoyée, ni texte, ni audio, ni identifiant, ni profil de votre Mac
+(`SUEnableSystemProfiling` est désactivé). GitHub ne reçoit que ce que porte toute
+requête web : votre adresse IP, votre langue, et les numéros de version de Murmure et
+de Sparkle dans l'en-tête `User-Agent`. Si vous acceptez une nouvelle version, l'app la
+télécharge depuis la même release GitHub. Hors ligne ou en cas d'erreur, rien ne
+s'affiche ; le journal en garde une ligne.
 
 Pour la couper, ajoutez dans `~/.local/share/murmure/config`, puis quittez et rouvrez
 Murmure :

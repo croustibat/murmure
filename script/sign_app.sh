@@ -1,6 +1,6 @@
 #!/bin/bash
 # Signe Murmure.app de l'intérieur vers l'extérieur : chaque outil de
-# Contents/Helpers, puis l'app avec ses entitlements.
+# Contents/Helpers, Sparkle.framework, puis l'app avec ses entitlements.
 #
 #   ./script/sign_app.sh <identité|-> <Murmure.app> [options codesign…]
 #
@@ -26,6 +26,22 @@ for outil in "$APP"/Contents/Helpers/*; do
         ${ent[@]+"${ent[@]}"} ${@+"$@"} "$outil"
 done
 
+# Sparkle arrive signé par ses auteurs : sous runtime durci, l'app refuse de
+# charger un framework d'une autre équipe. Ses services XPC ne servent qu'aux
+# apps sandboxées, ce que Murmure n'est pas : retirés plutôt que signés et
+# notarisés pour rien.
+SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
+if [ -d "$SPARKLE" ]; then
+    rm -rf "$SPARKLE/Versions/B/XPCServices" "$SPARKLE/XPCServices"
+    for composant in "$SPARKLE/Versions/B/Autoupdate" "$SPARKLE/Versions/B/Updater.app" "$SPARKLE"; do
+        codesign --force --sign "$IDENTITY" --options runtime ${@+"$@"} "$composant"
+    done
+fi
+
+# Ad hoc, l'app n'a pas d'équipe : sans Murmure-adhoc.entitlements, le runtime
+# durci refuserait de charger Sparkle.
+ENTITLEMENTS="$ROOT/app/Murmure.entitlements"
+[ "$IDENTITY" = - ] && ENTITLEMENTS="$ROOT/app/Murmure-adhoc.entitlements"
 codesign --force --sign "$IDENTITY" --options runtime ${@+"$@"} \
-    --entitlements "$ROOT/app/Murmure.entitlements" "$APP"
+    --entitlements "$ENTITLEMENTS" "$APP"
 codesign --verify --deep --strict "$APP"

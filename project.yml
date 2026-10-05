@@ -23,6 +23,12 @@ settings:
     # de développement subisse les mêmes contraintes (micro, Apple Events) que
     # la version notarisée.
     OTHER_CODE_SIGN_FLAGS: --options runtime
+# Mises à jour automatiques. Version exacte : la publication signe les helpers
+# de Sparkle et utilise ses outils, leur disposition doit rester connue.
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.0
 targets:
   Murmure:
     type: application
@@ -60,7 +66,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: dev.croustibat.murmure
         INFOPLIST_FILE: app/Info.plist
         GENERATE_INFOPLIST_FILE: NO
-        CODE_SIGN_ENTITLEMENTS: app/Murmure.entitlements
+        # Pour la seule signature ad hoc de Xcode ; script/sign_app.sh re-signe
+        # avec Murmure.entitlements dès qu'il y a un certificat.
+        CODE_SIGN_ENTITLEMENTS: app/Murmure-adhoc.entitlements
         # Clés MurmureHome et MurmureSourceSum d'Info.plist, données par
         # install.sh sur la ligne de commande de xcodebuild.
         MURMURE_INFO_HOME: ""
@@ -81,6 +89,8 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+      # Contents/Frameworks/Sparkle.framework, signé par script/sign_app.sh.
+      - package: Sparkle
     # whisper-cli n'est pas une cible : CMake le compile (scripts/build-whisper.sh,
     # lancé par install.sh et script/build_and_run.sh avant xcodebuild). Copié
     # par un script plutôt que déclaré en source, pour un message clair s'il

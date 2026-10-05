@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Signature ad hoc seulement (Xcode seul, ou script/sign_app.sh sans
+	     certificat) : les clés de Murmure.entitlements, plus la suivante. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+	<!-- Sans équipe, la validation des bibliothèques du runtime durci refuse
+	     Sparkle.framework et l'app s'arrête au lancement. Jamais avec un
+	     certificat : toute bibliothèque chargée hériterait des autorisations
+	     de Murmure. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>
