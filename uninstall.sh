@@ -56,7 +56,8 @@ fi
 # LaunchAgent), puis l'app résidente est quittée.
 [ -x "$APP/Contents/MacOS/Murmure" ] && "$APP/Contents/MacOS/Murmure" --demarrage non >/dev/null 2>&1 || true
 pkill -f "$APP/Contents/MacOS/Murmure" 2>/dev/null || true
-pkill -f "$APP/Contents/Helpers/overlay" 2>/dev/null || true   # pastille
+# Pastille, enregistreur, ou whisper-cli d'un préchauffage, qui survit à l'app.
+pkill -f "$APP/Contents/Helpers/" 2>/dev/null || true
 rm -rf "$APP" "$STATE_DIR"
 [ -n "$OLD_APP" ] && { pkill -f "$OLD_APP/Contents/MacOS/Murmure" 2>/dev/null || true; rm -rf "$OLD_APP"; }
 [ -f "$KB" ] && rm -f "$KB"
