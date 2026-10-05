@@ -86,7 +86,7 @@ restaurer() {
     [ -f "$CAPTURE" ] || return 0
     local cle type valeur
     for cle in $(cles_su); do
-        grep -q "^$cle	" "$CAPTURE" || defaults delete "$DOMAINE" "$cle"
+        grep -q "^$cle	" "$CAPTURE" || defaults delete "$DOMAINE" "$cle" || true
     done
     while IFS=$'\t' read -r cle type valeur; do
         case "$type" in
@@ -173,7 +173,10 @@ installee() { [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Con
 attendre 60 installee || fail "$APP est restée au build $((BUILD - 1))"
 sleep 2
 RELANCEE="$(pgrep -f "^$APP/Contents/MacOS/Murmure" || true)"
-[ -z "$RELANCEE" ] || fail "l'app installée a été relancée (pid $RELANCEE) : elle lit les données réelles"
+if [ -n "$RELANCEE" ]; then
+    PID="${RELANCEE%%[!0-9]*}"   # arrêtée par restaurer, c'est l'app de l'essai
+    fail "l'app installée a été relancée (pid $PID) : elle lirait les données réelles"
+fi
 
 CDHASH="$(codesign -dvvv "$APP" 2>&1 | sed -n 's/^CDHash=//p')"
 codesign --verify --deep --strict "$APP" || fail "codesign refuse l'app installée"
