@@ -85,6 +85,7 @@ entitlements, les mettre dans `app/<outil>.entitlements`.
 Numéros de version : `CFBundleShortVersionString` est lu dans `VERSION` à la
 compilation (phase « Version » de `project.yml`) ; `CFBundleVersion`, dans
 `app/Info.plist`, est un entier augmenté de 1 à chaque release, que Sparkle compare.
+`script/release.sh` met à jour les deux en publiant (voir « Publier une version »).
 
 ## Tester le téléchargement du modèle
 
@@ -118,67 +119,148 @@ embarquée diffère.
 
 ## Publier une version
 
-Les versions sont des **GitHub Releases** étiquetées `vX.Y.Z`. `Murmure.app` se met à
-jour avec Sparkle : au plus une fois par jour, elle lit `appcast.xml`, asset de la
-dernière release (`SUFeedURL` : `releases/latest/download/appcast.xml`, lien stable).
-Sparkle compare le `sparkle:version` de l'appcast au `CFBundleVersion` de l'app : seul
-un nombre plus grand propose la mise à jour. L'archive doit porter la signature EdDSA
-de la clé du compte `murmure` du trousseau (`sign_update --account murmure`), dont la
-clé publique est `SUPublicEDKey`, et la même signature Developer ID que l'app installée.
+Une version est une **GitHub Release** `vX.Y.Z` qui porte deux fichiers aux noms fixes,
+`Murmure.dmg` et `appcast.xml` : les liens `releases/latest/download/…` restent
+stables. `Murmure.app` se met à jour avec Sparkle : au plus une fois par jour, elle lit
+`appcast.xml` de la dernière release (`SUFeedURL`). Sparkle compare le
+`sparkle:version` de l'appcast au `CFBundleVersion` de l'app : seul un nombre plus
+grand propose la mise à jour. Le DMG doit porter la signature EdDSA de la clé du
+compte `murmure` du trousseau (clé publique : `SUPublicEDKey`) et la même signature
+Developer ID que l'app installée. L'app ne voit que la release « latest » : ni un tag
+seul, ni un brouillon, ni une pré-version. Une release sans `appcast.xml` n'est pas vue
+(le journal de l'app note l'erreur).
 
-L'app ne voit que la release « latest » : ni un simple tag, ni un brouillon, ni une
-pré-version ne la déclenchent. Une release sans `appcast.xml` n'est pas vue (le journal
-note l'erreur).
+`script/release.sh` fait tout, sur le modèle de Sillage :
 
-1. Mettre à jour `VERSION` sur `main` (`1.2.0`, sans `v`) :
-   - correctif : `1.1.0` → `1.1.1` ;
-   - fonctionnalité : `1.1.0` → `1.2.0` ;
-   - changement qui oblige à réinstaller ou à reconfigurer : `1.1.0` → `2.0.0`.
+```bash
+./script/release.sh                  # DMG notarisé et appcast dans dist/, sans publier
+./script/release.sh --no-notarize    # DMG signé seulement, pour tester
+./script/release.sh 1.2.0 --dry-run  # tout préparer, afficher la publication sans la faire
+./script/release.sh 1.2.0            # versionne, notarise et publie
+```
 
-   Augmenter aussi de 1 `CFBundleVersion` dans `app/Info.plist`.
+### Prérequis, une fois par Mac
 
-   Committer (« Version 1.2.0 ») et pousser.
+- Les outils de « Compiler » (Xcode, XcodeGen, CMake), et `gh` connecté à un compte
+  qui peut publier sur `croustibat/murmure` (`gh auth login`).
+- Le certificat **Developer ID Application: Baptiste Bouillot (MMJD6CLKNQ)** et sa clé
+  privée dans le trousseau : `security find-identity -v -p codesigning` le liste.
+  `MURMURE_SIGN_IDENTITY` (empreinte SHA-1 ou nom) choisit parmi plusieurs.
+- Le **profil notarytool `sillage-notary`**, déjà dans le trousseau : Murmure le partage
+  avec Sillage (même équipe). `xcrun notarytool history --keychain-profile sillage-notary`
+  doit répondre. Pour le recréer, un mot de passe pour app sur
+  <https://account.apple.com>, puis
+  `xcrun notarytool store-credentials sillage-notary --apple-id <apple-id> --team-id MMJD6CLKNQ`.
+  `MURMURE_NOTARY_PROFILE` désigne un autre profil.
+- La **clé EdDSA de Sparkle**, compte `murmure` du trousseau (élément « Private key for
+  signing Sparkle updates »), déjà générée, et dont la clé publique est `SUPublicEDKey`
+  dans `app/Info.plist`. Elle est propre à Murmure et ne vit jamais dans le dépôt. Elle
+  est **indispensable** : perdue, plus aucune mise à jour ne pourrait être signée pour
+  les apps installées. Elle est sauvegardée dans le gestionnaire de mots de passe.
+  Les outils de Sparkle sont dans le dossier de build de `release.sh`
+  (`xcodegen generate && xcodebuild -resolvePackageDependencies -project Murmure.xcodeproj -derivedDataPath ~/Library/Caches/Murmure/ReleaseBuild`
+  les télécharge sans compiler) :
 
-2. Vérifier que l'installation part bien de ce commit :
+  ```bash
+  BIN=~/Library/Caches/Murmure/ReleaseBuild/SourcePackages/artifacts/sparkle/Sparkle/bin
+  $BIN/generate_keys --account murmure -p                       # doit afficher SUPublicEDKey
+  $BIN/generate_keys --account murmure -x murmure-sparkle.key   # exporter, ranger, supprimer le fichier
+  $BIN/generate_keys --account murmure -f murmure-sparkle.key   # réimporter sur un autre Mac
+  ```
+
+  `MURMURE_SPARKLE_ACCOUNT` désigne un autre compte.
+
+### Publier
+
+1. Écrire la section `## X.Y.Z` de `CHANGELOG.md`, pour les utilisateurs : elle devient
+   les notes de la release GitHub et de la fenêtre de Sparkle (sans section, ce sont les
+   sujets des commits depuis le tag précédent). Committer et pousser sur `main`.
+
+   Numéro : correctif `1.2.0` → `1.2.1` ; fonctionnalité → `1.3.0` ; changement qui
+   oblige à réinstaller ou à reconfigurer → `2.0.0`. Ne toucher ni à `VERSION` ni à
+   `CFBundleVersion` : le script s'en charge.
+
+2. Vérifier sans rien publier, depuis `main` :
 
    ```bash
-   git pull && ./install.sh
+   ./script/release.sh 1.2.0 --dry-run --no-notarize
    ```
 
-   Le menu de Murmure affiche « Murmure 1.2.0 ».
+   Le script fait tout le travail, puis affiche le diff du commit de version, le tag, le
+   push et la commande `gh release create`, sans les lancer. Toute condition qui
+   bloquerait la vraie publication est listée à la fin (code de sortie 1). `VERSION` et
+   `app/Info.plist` reviennent à leur état ; le DMG et l'appcast restent dans `dist/`.
 
-3. Étiqueter ce commit et publier la release :
+3. Publier, depuis `main` propre et à jour :
 
    ```bash
-   v=$(tr -d '[:space:]' < VERSION)
-   git tag -a "v$v" -m "Murmure $v"
-   git push origin "v$v"
-   gh release create "v$v" --title "Murmure $v" --notes-file notes.md
+   ./script/release.sh 1.2.0
    ```
 
-   L'étiquette doit correspondre exactement au contenu de `VERSION` : une release
-   `v1.2.0` pour un `VERSION` resté à `1.1.0` signalerait la mise à jour indéfiniment,
-   même après `./install.sh`.
+   Dans l'ordre :
+   - vérifications, avant toute compilation : XcodeGen, certificat, profil de
+     notarisation, `gh` connecté, branche `main` sans changement et égale à
+     `origin/main`, `origin` = `croustibat/murmure`, tag et release absents, version
+     supérieure ou égale à `VERSION`, build supérieur au `sparkle:version` publié, clé
+     du trousseau égale à `SUPublicEDKey` ;
+   - `VERSION` ← `1.2.0`, `CFBundleVersion` + 1 dans `app/Info.plist` (remis en l'état
+     si la suite échoue) ;
+   - `scripts/build-whisper.sh`, `xcodegen generate`, `xcodebuild` Release arm64 dans
+     `~/Library/Caches/Murmure/ReleaseBuild` (`MURMURE_RELEASE_BUILD_DIR`), hors des
+     dossiers iCloud et à part du build d'`install.sh` ;
+   - signature par `script/sign_app.sh` avec horodatage : outils de
+     `Contents/Helpers`, `Autoupdate`, `Updater.app` et `Sparkle.framework`, puis l'app
+     avec ses entitlements. Chaque fichier Mach-O du bundle est ensuite contrôlé :
+     Developer ID de l'équipe MMJD6CLKNQ, horodatage, runtime durci, ni
+     `disable-library-validation` ni `get-task-allow` ;
+   - `dist/Murmure-1.2.0.dmg` (l'app et un lien vers Applications), signé,
+     **notarisé** (`notarytool submit --wait`, journal d'Apple affiché en cas de
+     refus), agrafé, accepté par `spctl` ;
+   - `dist/appcast.xml` par `generate_appcast --account murmure`, une seule entrée,
+     contrôlée : versions, macOS 14.0, adresse et taille du DMG, et signature EdDSA
+     vérifiée contre `SUPublicEDKey` ;
+   - commit « release: v1.2.0 », tag annoté `v1.2.0`, push atomique de `main` et du
+     tag, puis `gh release create v1.2.0 Murmure.dmg appcast.xml --latest`. Le tag est
+     poussé avant la release : créée d'abord, elle poserait le tag sur le commit
+     d'avant. Si la création échoue après le push, le script affiche la commande à
+     relancer ; les fichiers sont dans `dist/` ;
+   - contrôle : `releases/latest/download/appcast.xml` annonce le nouveau build.
 
-4. Les notes de release disent quoi faire aux versions ≤ 1.1.0, qui ne se mettent
-   pas à jour seules. Modèle de `notes.md` :
+4. Vérifier la page de la release et le lien
+   <https://github.com/croustibat/murmure/releases/latest/download/Murmure.dmg>. Une
+   Murmure de la version précédente propose la nouvelle par « Rechercher les mises à
+   jour… ». Le cask Homebrew (#46) se met à jour ensuite : point d'accroche en fin de
+   `release.sh`.
 
-   ```markdown
-   ## Nouveautés
-   - …
+La 1.1.0 n'a pas Sparkle : ses utilisateurs passent une fois au DMG (section « Vous avez
+la 1.1.0 ? » de `CHANGELOG.md`), les versions suivantes arrivent d'elles-mêmes.
 
-   ## Mettre à jour
-   Dans le dossier où vous avez cloné Murmure :
+### Essayer sans publier, sans trousseau ni notarisation
 
-       git pull && ./install.sh
+Une clé EdDSA jetable, en fichier, remplace la clé du trousseau (`--ed-key-file`). Le DMG
+reste celui d'une vraie publication : seul l'appcast est signé par la clé de test.
 
-   L'installeur indique en fin d'installation si `Murmure.app` a changé
-   d'identité : dans ce cas, macOS redemande les autorisations Micro et
-   Accessibilité.
-   ```
+```bash
+xcrun swift script/cle_sparkle.swift nouvelle /private/tmp/murmure-cle.txt
+./script/release.sh 1.2.0 --dry-run --no-notarize --ed-key-file /private/tmp/murmure-cle.txt
+./script/essai_release.sh /private/tmp/murmure-essai-release /private/tmp/murmure-cle.txt
+```
 
-La mise à jour se teste sans rien publier ni toucher au trousseau, à côté de l'app
-installée :
+`essai_release.sh` installe sous `/private/tmp` une copie de l'app du DMG ramenée au
+build précédent, qui lit l'appcast de `dist/` servi sur `127.0.0.1`. Elle porte la clé
+publique de test, la mise à jour automatique et son propre `MURMURE_HOME`. Sparkle
+télécharge le DMG ; le script ferme l'app (Sparkle installe à la fermeture, sans
+relancer), puis vérifie que l'app installée a le build et le CDHash de celle du DMG. Les
+réglages `SU*` de `dev.croustibat.murmure`, partagés avec l'app réelle, retrouvent leur
+valeur, et les apps de l'essai sortent de LaunchServices.
+
+Pour vérifier le DMG à la main : `hdiutil attach -nobrowse -readonly` puis
+`codesign --verify --deep --strict` et `spctl --assess --type execute -vv` sur une copie
+de l'app. Sans notarisation, Gatekeeper refuse avec `source=Unnotarized Developer ID`,
+et pour cette seule raison.
+
+La mise à jour se teste aussi avec deux builds compilées depuis les sources, sans
+`release.sh`, à côté de l'app installée :
 
 ```bash
 script/essai_mise_a_jour.sh /private/tmp/murmure-essai
@@ -202,4 +284,19 @@ Sparkle range la date de sa dernière vérification dans les réglages de
 `dev.croustibat.murmure` : `defaults delete dev.croustibat.murmure SULastCheckTime`
 autorise une nouvelle vérification au lancement. Après l'essai,
 `script/essai_mise_a_jour.sh /private/tmp/murmure-essai --nettoyer` retire ces réglages
-et le dossier.
+(ceux de l'app réelle aussi) et le dossier.
+
+### Gatekeeper sur un autre Mac
+
+Avant une première publication, un DMG notarisé passe par un vrai téléchargement :
+
+```bash
+./script/release.sh            # notarisé, non publié : dist/Murmure.dmg
+gh release create v1.2.0-rc1 dist/Murmure.dmg --repo croustibat/murmure --draft --prerelease --title "Murmure 1.2.0-rc1"
+```
+
+Sur un autre Mac Apple Silicon, connecté à GitHub dans le navigateur, télécharger
+`Murmure.dmg` depuis le brouillon, l'ouvrir, glisser Murmure dans Applications et
+l'ouvrir par un double-clic : aucun avertissement, sans clic droit > Ouvrir. Puis
+`gh release delete v1.2.0-rc1 --repo croustibat/murmure --yes`. Un brouillon n'est
+jamais vu par Sparkle.
