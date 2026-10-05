@@ -2,18 +2,21 @@ import AppKit
 import ApplicationServices
 import AVFoundation
 
-// Autorisations dont dépend Murmure. osascript et ffmpeg, lancés par
+// Autorisations dont dépend Murmure. osascript et murmure-rec, lancés par
 // murmure.sh, sont des processus enfants de l'app : macOS leur applique les
 // autorisations de Murmure.app, que l'app peut donc vérifier elle-même.
 // - Accessibilité (⌘V automatique) : AXIsProcessTrusted(), sans invite.
-//   Quand Murmure.app est recréée, l'ancienne entrée des Réglages reste
-//   cochée mais ne vaut plus : il faut la supprimer (–) puis la rajouter.
+//   Quand Murmure.app change de signature (copie compilée sur ce Mac,
+//   remplacée par celle du DMG, ou l'inverse), l'ancienne entrée des
+//   Réglages reste cochée mais ne vaut plus : il faut la supprimer (–) puis
+//   la rajouter.
 // - Micro : seul un refus explicite est signalé ; non déterminé, macOS pose
 //   la question à la première dictée.
 // Tant qu'il manque quelque chose : une ligne d'alerte en tête du menu, une
 // icône marquée, et une vérification toutes les 2 s, arrêtée dès que tout
 // est accordé. Une alerte explicative s'affiche une seule fois par version
-// de l'app (mémoire : $MURMURE_HOME/.autorisations).
+// de l'app (mémoire : $MURMURE_HOME/.autorisations), quand la barre appelle
+// guider() : au premier lancement, après le téléchargement du modèle.
 //
 // MURMURE_AX_NO_PROMPT=1 (environnement, tests) : ni invite système, ni
 // alerte, ni ouverture des Réglages ; le journal note ce qui aurait eu lieu.
@@ -55,16 +58,24 @@ final class Autorisations: NSObject {
         return date > lancement
     }
 
+    // Au lancement : le menu et l'icône signalent tout de suite ce qui manque.
     func demarrer() {
         verifier()
         let ax = accessibiliteAccordee, mic = !microRefuse
         journal("autorisations : Accessibilité \(ax ? "accordée" : "absente"), Micro \(mic ? "non refusé" : "refusé")")
         if ax && mic {
             try? FileManager.default.removeItem(atPath: memoire)   // alerte à revoir si elle se perd
-        } else if lireMemoire() != empreinte {
-            try? (empreinte + "\n").write(toFile: memoire, atomically: true, encoding: .utf8)
-            DispatchQueue.main.async { self.expliquer(accessibilite: !ax) }
         }
+    }
+
+    // L'alerte explicative, si quelque chose manque encore et qu'elle n'a pas
+    // été vue pour cette version. Elle est modale : la barre l'appelle quand
+    // la fenêtre du modèle n'est plus à l'écran.
+    func guider() {
+        let ax = accessibiliteAccordee, mic = !microRefuse
+        guard !(ax && mic), lireMemoire() != empreinte else { return }
+        try? (empreinte + "\n").write(toFile: memoire, atomically: true, encoding: .utf8)
+        DispatchQueue.main.async { self.expliquer(accessibilite: !ax) }
     }
 
     // Met le menu et l'icône à jour. Peu coûteux : appelé à l'ouverture du
@@ -147,7 +158,8 @@ final class Autorisations: NSObject {
 
                 Dans Réglages > Confidentialité et sécurité > Accessibilité :
                 • si Murmure figure déjà dans la liste, même cochée, sélectionnez-la et \
-                supprimez-la (–) : après une mise à jour, l'ancienne entrée ne vaut plus ;
+                supprimez-la (–) : elle désigne une copie précédente de l'app (compilée sur \
+                ce Mac par ./install.sh, ou signée par un autre certificat) et ne vaut plus ;
                 • ajoutez Murmure (+, puis ⌘⇧G et \(Bundle.main.bundlePath)) et cochez-la.
 
                 L'alerte du menu disparaît dès que l'autorisation est accordée.

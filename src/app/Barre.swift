@@ -37,6 +37,10 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         autorisations.changement = { [weak self] in self?.dessinerIcone() }
         autorisations.demarrer()
         modele.demarrer()
+        // Sur un compte neuf, l'alerte Accessibilité (modale) s'afficherait
+        // par-dessus la fenêtre du modèle : elle attend qu'il soit en place.
+        if modele.manquant { journal("autorisations : guidage après la préparation du modèle") }
+        modele.quandLibre { [weak self] in self?.autorisations.guider() }
     }
 
     private func construireMenu() {
