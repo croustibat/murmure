@@ -40,16 +40,6 @@ fail() { printf '%s✗%s %s\n' "$red" "$off" "$1" >&2; exit 1; }
 CHANGES=()
 note() { CHANGES+=("$1"); }
 
-# Copie seulement si le contenu diffère, et le consigne dans le bilan.
-install_if_changed() {  # mode source destination libellé
-  if [ -f "$3" ] && cmp -s "$2" "$3"; then
-    note "$4 : inchangé"
-  else
-    if [ -f "$3" ]; then note "$4 : mis à jour"; else note "$4 : installé"; fi
-    install -m "$1" "$2" "$3"
-  fi
-}
-
 fsize()  { stat -f %z "$1" 2>/dev/null || echo 0; }
 sha256() { shasum -a 256 "$1" | cut -d' ' -f1; }
 
@@ -57,9 +47,12 @@ sha256() { shasum -a 256 "$1" | cut -d' ' -f1; }
 
 step "Vérification des dépendances"
 command -v brew >/dev/null || fail "Homebrew est requis : https://brew.sh"
-command -v whisper-cli >/dev/null || { step "Installation de whisper.cpp"; brew install whisper-cpp; }
-command -v whisper-cli >/dev/null || fail "whisper-cli introuvable après installation."
-ok "whisper-cli présent"
+# whisper-cli est compilé depuis whisper.cpp (scripts/build-whisper.sh) et
+# embarqué dans Murmure.app : il ne faut que CMake, trouvé comme le fait le script.
+if [ -z "${CMAKE:-}" ] && ! command -v cmake >/dev/null && [ ! -x /Applications/CMake.app/Contents/bin/cmake ]; then
+  step "Installation de CMake"; brew install cmake
+fi
+ok "CMake présent"
 # Murmure.app se compile avec Xcode, à partir du projet que XcodeGen génère
 # depuis project.yml.
 xcodebuild -version >/dev/null 2>&1 \
@@ -69,9 +62,8 @@ command -v xcodegen >/dev/null || fail "xcodegen introuvable après installation
 ok "Xcode et XcodeGen présents"
 
 step "Installation des fichiers dans $MURMURE_HOME"
+# Données seulement : le moteur (murmure.sh, corriger.pl) est dans Murmure.app.
 mkdir -p "$MURMURE_HOME/models"
-install_if_changed 755 "$SRC/src/murmure.sh"  "$MURMURE_HOME/murmure.sh"  "murmure.sh"
-install_if_changed 755 "$SRC/src/corriger.pl" "$MURMURE_HOME/corriger.pl" "corriger.pl"
 for f in vocabulaire corrections; do
   if [ -f "$MURMURE_HOME/$f.txt" ]; then
     warn "$f.txt existe déjà — conservé (nouvelle version dans $f.txt.dist)"
@@ -88,7 +80,7 @@ else
   install -m 644 "$SRC/config/config.exemple" "$MURMURE_HOME/config"
   note "config : installé"
 fi
-ok "scripts et configuration en place"
+ok "configuration en place"
 
 # Téléchargement vers .part avec reprise (curl -C -), vérification SHA-256, puis
 # mv atomique : un fichier tronqué ne peut plus passer pour un modèle valide.
@@ -151,12 +143,12 @@ fi
 # ne re-signe le bundle que si son contenu ou l'identité de signature change.
 # Info.plist porte l'empreinte de tout ce qui entre dans le bundle et de la
 # version de Xcode : l'app n'est recompilée que si cette empreinte change.
-# Les mises à jour de murmure.sh ne la touchent pas.
+# Le moteur en fait partie : modifier murmure.sh recompile l'app.
 step "Création de Murmure.app"
 VERSION="$(tr -d '[:space:]' < "$SRC/VERSION")"
 # Ce que project.yml compile, copie ou signe dans le bundle : un nouvel outil
 # de Contents/Helpers y ajoute ses sources.
-APP_SOURCES=(project.yml VERSION app src/app src/overlay.swift src/rec script/sign_app.sh)
+APP_SOURCES=(project.yml VERSION app src/app src/overlay.swift src/rec script/sign_app.sh src/murmure.sh src/corriger.pl config scripts/build-whisper.sh scripts/whisper.version)
 APP_SUM="$( { (cd "$SRC" && find "${APP_SOURCES[@]}" -type f ! -name .DS_Store -print0 \
   | LC_ALL=C sort -z | xargs -0 shasum -a 256); xcodebuild -version; } | shasum -a 256 | cut -d' ' -f1)"
 # Hors des dossiers synchronisés par iCloud, comme script/build_and_run.sh.
@@ -245,6 +237,9 @@ else
   mkdir -p "$BUILD_DIR"
   BUILD_LOG="$BUILD_DIR/install.log"
   (cd "$SRC" && xcodegen generate --quiet) || fail "génération du projet Xcode impossible (project.yml)"
+  # whisper-cli, compilé à part (CMake), est copié dans le bundle par
+  # xcodebuild : quelques secondes s'il est déjà à jour.
+  "$SRC/scripts/build-whisper.sh" || fail "compilation de whisper-cli impossible — journal : $SRC/build/whisper/compilation.log"
   xcodebuild -project "$SRC/Murmure.xcodeproj" -scheme Murmure -configuration Release \
       -derivedDataPath "$BUILD_DIR" -destination 'platform=macOS,arch=arm64' \
       CODE_SIGNING_ALLOWED=NO MURMURE_INFO_HOME="$MURMURE_HOME" MURMURE_INFO_SOURCE_SUM="$APP_SUM" \
@@ -275,11 +270,11 @@ else
   ok "$APP ($VERSION, $(signed_as))"
 fi
 
-# La pastille est dans Murmure.app (Contents/Helpers) : la copie que les
-# versions ≤ 1.1.0 compilaient ici ne sert plus.
-if [ -e "$MURMURE_HOME/overlay" ] || [ -e "$MURMURE_HOME/overlay.sha256" ]; then
-  rm -f "$MURMURE_HOME/overlay" "$MURMURE_HOME/overlay.sha256"
-  note "ancienne pastille de $MURMURE_HOME : retirée (elle est dans Murmure.app)"
+# Le moteur et la pastille sont dans Murmure.app : les copies des versions
+# ≤ 1.1.0 restent dans $MURMURE_HOME jusqu'à la première dictée réussie, qui
+# les retire (revenir à l'ancienne app marche encore d'ici là).
+if [ -e "$MURMURE_HOME/murmure.sh" ] || [ -e "$MURMURE_HOME/overlay" ]; then
+  note "ancien moteur de $MURMURE_HOME : retiré à la première dictée (il est dans Murmure.app)"
 fi
 
 # Règles actives de karabiner.json qui lancent Murmure (« murmure|profil|règle|

@@ -40,9 +40,9 @@ cd murmure
 ./install.sh
 ```
 
-L'installeur pose `ffmpeg`, `whisper-cpp` et XcodeGen, télécharge le modèle (~550 Mo,
-une fois), compile l'app `/Applications/Murmure.app` et sa pastille, puis la lance :
-son icône apparaît dans la barre des menus.
+L'installeur pose CMake et XcodeGen, télécharge le modèle (~550 Mo, une fois), compile
+`whisper-cli` (whisper.cpp) et l'app `/Applications/Murmure.app`, qui les embarque,
+puis la lance : son icône apparaît dans la barre des menus.
 
 Le menu signale une nouvelle version (« Version X.Y.Z disponible », qui ouvre la page
 de la release). Pour mettre à jour, `git pull` puis `./install.sh` à nouveau. L'installeur ne remplace
@@ -203,6 +203,7 @@ autre qu'un code comme `fr` ou `auto`) est ignorée et signalée dans le journal
 | `MURMURE_HOLD_MS` | `600` | au-delà, relâcher ⌘⇧E arrête l'écoute (appui maintenu) |
 | `MURMURE_SILENCE_DB` | `-70` | seuil en dessous duquel l'audio est jugé muet |
 | `MURMURE_WHISPER_ARGS` | _(vide)_ | options ajoutées à `whisper-cli`, par exemple `-bs 1 -bo 1` |
+| `MURMURE_WHISPER` | _(celui de l'app)_ | chemin absolu d'un autre `whisper-cli`, par exemple une autre version |
 | `MURMURE_SHORTCUT` | `cmd+shift+e` | raccourci global, lu par `Murmure.app` à son lancement (voir « Le raccourci ») |
 | `MURMURE_HISTORY` | `1` | `0` : les dictées ne sont plus enregistrées dans l'historique (voir « Le menu ») |
 | `MURMURE_CHECK_UPDATES` | `1` | `0` coupe la vérification des nouvelles versions, lu par `Murmure.app` à son lancement (voir « Réseau ») |
@@ -246,7 +247,7 @@ n'est pas trouvé, Murmure prend le micro `:0` et le note dans le journal.
 `MURMURE_DEVICE=:default` suit le micro choisi dans les réglages du système.
 
 Une variable d'environnement du même nom l'emporte sur le fichier, pratique pour un
-essai depuis le terminal : `MURMURE_LANG=en ~/.local/share/murmure/murmure.sh`.
+essai depuis le terminal : `MURMURE_LANG=en /Applications/Murmure.app/Contents/Resources/engine/murmure.sh`.
 Lancé par le raccourci, Murmure ne reçoit aucune variable : seul le fichier compte.
 
 ### Corrections
@@ -293,6 +294,10 @@ scripts/bench.sh -c 'défaut|' -b 'embarqué|build/whisper/whisper-cli' \
                       ├─ corriger.pl ────────────→ vocabulaire rectifié
                       └─ pbcopy + ⌘V ───────────→ application active
 ```
+
+`murmure.sh`, `corriger.pl` et les outils vivent dans `Murmure.app` : une mise à jour de
+l'app met le moteur à jour. `~/.local/share/murmure` ne garde que vos données (réglages,
+vocabulaire, corrections, modèle, historique).
 
 Le bundle `.app` n'est pas cosmétique : un script nu n'a pas d'identité TCC, macOS ne
 propose donc jamais l'autorisation micro et lui livre **un flux muet** au lieu d'une

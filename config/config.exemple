@@ -34,6 +34,10 @@
 # Options ajoutées à whisper-cli, par exemple : -bs 1 -bo 1
 #MURMURE_WHISPER_ARGS=
 
+# Autre whisper-cli que celui de Murmure.app (chemin absolu), par exemple une
+# autre version compilée à part. Sans ce réglage : celui de l'app.
+#MURMURE_WHISPER=/chemin/vers/whisper-cli
+
 # Raccourci global, lu par Murmure.app à son lancement (quitter et rouvrir
 # Murmure après modification à la main ; appliqué aussitôt depuis Réglages…).
 # Modificateurs cmd, shift, alt, ctrl + une touche.

@@ -2,13 +2,20 @@
 
 ## Compiler
 
-Il faut Xcode (ouvert une fois) et XcodeGen (`brew install xcodegen`). L'app est
+Il faut Xcode (ouvert une fois), XcodeGen (`brew install xcodegen`) et CMake
+(`brew install cmake`, ou CMake.app de cmake.org) pour `whisper-cli`. L'app est
 décrite par `project.yml` ; `Murmure.xcodeproj` en est généré et n'est pas versionné.
 
 ```bash
 script/build_and_run.sh               # Debug : génère, compile, signe et lance
 script/build_and_run.sh --build-only  # sans lancer
 ```
+
+`whisper-cli` n'est pas une cible Xcode : `scripts/build-whisper.sh` le compile depuis
+whisper.cpp (version figée dans `scripts/whisper.version`) dans `build/whisper/`, et
+xcodebuild le copie dans le bundle. `build_and_run.sh` et `install.sh` le lancent
+d'abord (quelques secondes s'il est à jour) ; sans lui, la compilation échoue sur
+« build/whisper/whisper-cli manquant ».
 
 Le build va dans `~/Library/Caches/Murmure/Build` (`MURMURE_BUILD_DIR` pour un autre
 dossier), hors des dossiers synchronisés par iCloud. Il est signé comme le fait
@@ -17,20 +24,44 @@ dossier), hors des dossiers synchronisés par iCloud. Il est signé comme le fai
 (`dev.croustibat.murmure`) et même certificat que l'app installée : il en partage les
 autorisations Micro et Accessibilité.
 
-Ce build lit l'installation par défaut (`~/.local/share/murmure`) ; les variables
-`MURMURE_*` de l'environnement lui sont transmises. Une seule Murmure tourne par
-dossier d'état : quitter l'app installée, ou lancer le build à côté :
+Ce build lit les données de l'installation par défaut (`~/.local/share/murmure`) et
+tourne avec son propre moteur ; les variables `MURMURE_*` de l'environnement lui sont
+transmises. Une seule Murmure tourne par dossier d'état : quitter l'app installée, ou
+lancer le build à côté :
 
 ```bash
 MURMURE_STATE_DIR=/tmp/murmure-dev MURMURE_SHORTCUT=ctrl+alt+shift+cmd+f19 script/build_and_run.sh
 ```
 
-Sans les scripts, `xcodegen generate && xcodebuild -scheme Murmure` produit une app
-signée ad hoc, dans les DerivedData de Xcode.
+Sans les scripts, `scripts/build-whisper.sh && xcodegen generate && xcodebuild -scheme
+Murmure` produit une app signée ad hoc, dans les DerivedData de Xcode.
 
-Le bundle contient l'app (`src/app/`) et, dans `Contents/Helpers`, les outils lancés
-par `murmure.sh` : aujourd'hui la pastille (`overlay`, `src/overlay.swift`). Il tourne
-sous runtime durci, avec deux entitlements (`app/Murmure.entitlements`) :
+Le bundle contient tout ce qui fait tourner Murmure ; une mise à jour de l'app met donc
+aussi le moteur à jour :
+
+| Dans `Murmure.app/Contents/` | Source |
+|---|---|
+| `MacOS/Murmure` | l'app (`src/app/`) |
+| `Resources/engine/murmure.sh`, `corriger.pl` | le moteur (`src/`) |
+| `Resources/defaults/` | réglages par défaut (`config/`) |
+| `Resources/Licences/` | licences des composants embarqués (`app/Licences/`) |
+| `Helpers/overlay`, `murmure-rec`, `whisper-cli` | la pastille, l'enregistreur, whisper.cpp |
+
+`~/.local/share/murmure` (`MURMURE_HOME`) ne garde que les données de l'utilisateur :
+`config`, `vocabulaire.txt`, `corrections.txt`, `models/`, `historique.jsonl`,
+`cadence`. Au lancement, l'app y dépose les réglages par défaut qui manquent, sans
+jamais écraser un fichier (un vocabulaire ou des corrections modifiés reçoivent la
+nouvelle version à côté, en `.dist`).
+
+`murmure.sh` trouve les outils à côté de lui, dans le bundle. Lancé depuis les sources
+(`src/murmure.sh`), il prend ceux de l'app désignée par `MURMURE_APP`, sinon de
+`/Applications/Murmure.app`, et le `corriger.pl` voisin. `MURMURE_WHISPER`,
+`MURMURE_REC`, `MURMURE_OVERLAY` et `MURMURE_CORRIGER` imposent un autre outil
+(`MURMURE_WHISPER` aussi depuis `config`). Il ne compte que sur le système : `PATH`
+réduit à `/usr/bin:/bin:/usr/sbin:/sbin`, et `/usr/bin/perl` pour `corriger.pl`,
+l'horodatage et l'historique.
+
+L'app tourne sous runtime durci, avec deux entitlements (`app/Murmure.entitlements`) :
 `com.apple.security.device.audio-input` (sans lui, le micro rend un flux muet) et
 `com.apple.security.automation.apple-events` (le ⌘V passe par System Events).
 

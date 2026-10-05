@@ -12,9 +12,13 @@ import AppKit
 let statusPath = CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
     : "/tmp/murmure-\(getuid())/status"
+// Sans argument : le moteur du bundle (Contents/Helpers/overlay →
+// Contents/Resources/engine/murmure.sh).
 let toggleScript = CommandLine.arguments.count > 2
     ? CommandLine.arguments[2]
-    : NSString(string: "~/.local/share/murmure/murmure.sh").expandingTildeInPath
+    : (Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0]))
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Resources/engine/murmure.sh").path
 let levelsPath = (statusPath as NSString).deletingLastPathComponent + "/levels"
 let startedPath = (statusPath as NSString).deletingLastPathComponent + "/started"
 
