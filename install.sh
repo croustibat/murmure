@@ -42,22 +42,62 @@ note() { CHANGES+=("$1"); }
 
 fsize()  { stat -f %z "$1" 2>/dev/null || echo 0; }
 sha256() { shasum -a 256 "$1" | cut -d' ' -f1; }
+info_of() {  # app clé → valeur dans Info.plist, vide si absente
+  /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null || true
+}
+signer_of() {  # app → nom du certificat, ou « - » si ad hoc
+  local who
+  who="$(codesign -dvv "$1" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+  echo "${who:--}"
+}
 
 [ "$(uname -s)" = "Darwin" ] || fail "Murmure ne fonctionne que sur macOS."
 
+# App distribuée (DMG, cask Homebrew, ou mise à jour Sparkle) : compilée par
+# script/release.sh, signée Developer ID, sans empreinte des sources dans
+# Info.plist, qu'une build d'install.sh porte toujours. La remplacer par une
+# build locale se décide avant de compiler quoi que ce soit.
+if [ -x "$APP/Contents/MacOS/Murmure" ] && [ -z "$(info_of "$APP" MurmureSourceSum)" ]; then
+  PUBLISHED_SIGNER="$(signer_of "$APP")"
+  case "$PUBLISHED_SIGNER" in
+    "Developer ID Application: "*)
+      step "Murmure.app déjà installée"
+      warn "$APP est la version $(info_of "$APP" CFBundleShortVersionString) publiée (DMG ou Homebrew),"
+      echo "      signée « $PUBLISHED_SIGNER »."
+      echo "      L'installeur la remplace par une build compilée sur ce Mac :"
+      echo "      - à la prochaine version publiée, la mise à jour automatique remettra"
+      echo "        celle du DMG à sa place ;"
+      echo "      - signée par un autre certificat (ou ad hoc), elle obligera à redonner"
+      echo "        les autorisations Micro et Accessibilité."
+      if command -v brew >/dev/null && [ -d "$(brew --prefix)/Caskroom/murmure" ]; then
+        echo "      Installée par Homebrew : brew uninstall --cask murmure d'abord."
+      fi
+      printf '    Remplacer par la build locale ? [o/N] '
+      read -r answer || answer=""
+      case "$answer" in [oO]*) ;; *) echo "    Rien n'a été modifié."; exit 0 ;; esac
+      note "Murmure.app : version publiée remplacée par la build locale"
+      ;;
+  esac
+fi
+
 step "Vérification des dépendances"
-command -v brew >/dev/null || fail "Homebrew est requis : https://brew.sh"
+# Homebrew ne sert qu'à poser CMake ou XcodeGen s'ils manquent.
+brew_install() {  # formule
+  command -v brew >/dev/null \
+    || fail "$1 est requis : installez-le, ou installez Homebrew (https://brew.sh) pour que ./install.sh s'en charge"
+  step "Installation de $1"; brew install "$1"
+}
 # whisper-cli est compilé depuis whisper.cpp (scripts/build-whisper.sh) et
 # embarqué dans Murmure.app : il ne faut que CMake, trouvé comme le fait le script.
 if [ -z "${CMAKE:-}" ] && ! command -v cmake >/dev/null && [ ! -x /Applications/CMake.app/Contents/bin/cmake ]; then
-  step "Installation de CMake"; brew install cmake
+  brew_install cmake
 fi
 ok "CMake présent"
 # Murmure.app se compile avec Xcode, à partir du projet que XcodeGen génère
 # depuis project.yml.
 xcodebuild -version >/dev/null 2>&1 \
   || fail "Xcode est requis pour compiler Murmure.app : installez-le (App Store), ouvrez-le une fois, puis sudo xcode-select -s /Applications/Xcode.app"
-command -v xcodegen >/dev/null || { step "Installation de XcodeGen"; brew install xcodegen; }
+command -v xcodegen >/dev/null || brew_install xcodegen
 command -v xcodegen >/dev/null || fail "xcodegen introuvable après installation."
 ok "Xcode et XcodeGen présents"
 
@@ -153,9 +193,6 @@ APP_SUM="$( { (cd "$SRC" && find "${APP_SOURCES[@]}" -type f ! -name .DS_Store -
   | LC_ALL=C sort -z | xargs -0 shasum -a 256); xcodebuild -version; } | shasum -a 256 | cut -d' ' -f1)"
 # Hors des dossiers synchronisés par iCloud, comme script/build_and_run.sh.
 BUILD_DIR="${MURMURE_BUILD_DIR:-$HOME/Library/Caches/Murmure/Build}"
-info_of() {  # app clé → valeur dans Info.plist, vide si absente
-  /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null || true
-}
 
 # Identité de signature. Signée par un certificat, l'app est reconnue par macOS
 # à son identifiant et à son équipe : les autorisations survivent aux
@@ -183,11 +220,6 @@ fi
 SIGN_HASH="${SIGN_LINE%% *}"; SIGN_NAME="${SIGN_LINE#* }"
 [ -n "$SIGN_LINE" ] || { SIGN_HASH="-"; SIGN_NAME="-"; }
 
-signer_of() {  # app → nom du certificat, ou « - » si ad hoc
-  local who
-  who="$(codesign -dvv "$1" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
-  echo "${who:--}"
-}
 # Signe l'app et ses outils (runtime durci, entitlements) ; un certificat
 # inutilisable (trousseau verrouillé, en SSH par exemple) laisse une signature
 # ad hoc plutôt qu'une app non signée.
