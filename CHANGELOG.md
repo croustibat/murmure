@@ -18,7 +18,7 @@ section de la version publiée dans la release GitHub et dans la fenêtre de mis
 
 ### Vous avez la 1.1.0 ?
 
-La 1.1.0 ne se met pas à jour seule : téléchargez Murmure.dmg et remplacez l'app ; vos réglages, votre vocabulaire et le modèle sont conservés. Les versions suivantes arriveront d'elles-mêmes.
+La 1.1.0 ne se met pas à jour seule : quittez Murmure (menu > Quitter Murmure), téléchargez Murmure.dmg et glissez l'app dans Applications en remplaçant l'ancienne ; vos réglages, votre vocabulaire et le modèle sont conservés. Les versions suivantes arriveront d'elles-mêmes.
 
 L'app change de signature : macOS redemande l'accès au micro à la première dictée. Pour le collage automatique, dans Réglages Système > Confidentialité et sécurité > Accessibilité, supprimez l'ancienne entrée Murmure (–), puis ajoutez la nouvelle (+) et cochez-la.
 

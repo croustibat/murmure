@@ -22,7 +22,7 @@ import UniformTypeIdentifiers
 //   première dictée ne l'attend pas, et aucune n'est bloquée pendant ce temps.
 // MURMURE_MODEL (chemin complet, comme pour murmure.sh) : modèle fourni à la
 // main, jamais téléchargé ni vérifié.
-final class Modele: NSObject {
+final class Modele: NSObject, NSWindowDelegate {
     private enum Phase {
         case attente(String?, reessayer: Bool)   // message en rouge
         case telechargement
@@ -49,6 +49,7 @@ final class Modele: NSObject {
     private var recus: Int64 = 0
     private var total: Int64?
     private var prechauffage: Process?
+    private var siLibre: (() -> Void)?
 
     private var fenetre: NSWindow?
     private let titre = NSTextField(labelWithString: "")
@@ -111,6 +112,26 @@ final class Modele: NSObject {
         case .preparation, .pret: manquant = false
         }
         afficher()
+        liberer()
+    }
+
+    // Exécute bloc une fois le modèle en place et sa fenêtre fermée (tout de
+    // suite si elle ne s'est pas ouverte) : au premier lancement, rien ne
+    // vient s'empiler sur le téléchargement.
+    func quandLibre(_ bloc: @escaping () -> Void) {
+        siLibre = bloc
+        liberer()
+    }
+
+    private func liberer() {
+        guard !manquant, fenetre?.isVisible != true, let bloc = siLibre else { return }
+        siLibre = nil
+        bloc()
+    }
+
+    // La fenêtre est encore visible pendant cet appel.
+    func windowWillClose(_ notification: Notification) {
+        DispatchQueue.main.async { self.liberer() }
     }
 
     // MARK: modèle présent au lancement
@@ -384,6 +405,7 @@ final class Modele: NSObject {
                          styleMask: [.titled, .closable], backing: .buffered, defer: false)
         w.title = "Murmure"
         w.isReleasedWhenClosed = false
+        w.delegate = self
 
         let largeur: CGFloat = 360
         titre.font = .boldSystemFont(ofSize: 15)

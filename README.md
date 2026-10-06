@@ -3,6 +3,9 @@
 **Dictée vocale globale pour macOS, 100 % locale.**
 Un raccourci, vous parlez, le texte s'écrit dans l'application active.
 
+**[Télécharger pour Mac](https://github.com/croustibat/murmure/releases/latest/download/Murmure.dmg)**
+(macOS 14+, Apple Silicon, gratuit) · [Installation](#installation) · [English](#english)
+
 ![Murmure en écoute](docs/apercu-ecoute.png)
 
 Pas de compte, pas d'abonnement, pas de clé API, aucune donnée qui sort de votre Mac
@@ -31,8 +34,50 @@ il transforme votre voix en texte, partout, sans rien envoyer nulle part.
 
 ## Installation
 
-Prérequis : macOS 14 ou plus, [Homebrew](https://brew.sh), et
-[Xcode](https://apps.apple.com/app/xcode/id497799835) (ouvert une fois).
+Il faut un Mac Apple Silicon (M1 ou plus récent) sous macOS 14 ou plus.
+
+### Télécharger l'app
+
+1. Téléchargez **[Murmure.dmg](https://github.com/croustibat/murmure/releases/latest/download/Murmure.dmg)**.
+2. Ouvrez-le, glissez **Murmure** dans **Applications**, puis lancez-la depuis le dossier
+   Applications : son icône apparaît dans la barre des menus.
+3. Au premier lancement, Murmure propose de télécharger son modèle de transcription
+   (~550 Mo, une seule fois, vérifié par son empreinte SHA-256).
+
+L'app est signée et notarisée par Apple : elle s'ouvre sans avertissement. Elle
+embarque tout ce qu'il lui faut (whisper.cpp, l'enregistreur, la pastille) : ni
+Homebrew, ni Xcode, ni outil en ligne de commande.
+
+### Avec Homebrew
+
+```bash
+brew install --cask croustibat/tap/murmure
+```
+
+C'est la même app que celle du DMG ; elle se met à jour toute seule, de la même façon.
+
+### Mises à jour
+
+Murmure regarde une fois par jour si une nouvelle version est publiée et propose de
+l'installer en un clic (**Rechercher les mises à jour…** dans le menu le fait
+sur-le-champ, voir [Réseau](#réseau)). Réglages, vocabulaire, corrections, historique
+et modèle sont conservés, ainsi que les autorisations.
+
+**Depuis la version 1.1.0 ou une plus ancienne** (installée avec `./install.sh`), il
+n'y a pas de mise à jour automatique : quittez Murmure (menu > **Quitter Murmure**),
+téléchargez [Murmure.dmg](https://github.com/croustibat/murmure/releases/latest/download/Murmure.dmg)
+et glissez l'app dans Applications en remplaçant l'ancienne. Vos réglages, votre
+vocabulaire, vos corrections, votre historique et le modèle sont conservés : ils sont
+dans `~/.local/share/murmure`, que l'app reprend tel quel. L'ancienne app avait été
+compilée sur votre Mac : macOS redemande une fois le micro et l'Accessibilité (voir
+plus bas). Les copies de l'ancien moteur dans `~/.local/share/murmure` disparaissent
+d'elles-mêmes après la première dictée.
+
+### Depuis les sources
+
+Pour compiler Murmure vous-même : il faut [Xcode](https://apps.apple.com/app/xcode/id497799835)
+(ouvert une fois), CMake et XcodeGen, que l'installeur pose avec
+[Homebrew](https://brew.sh) s'ils manquent.
 
 ```bash
 git clone https://github.com/croustibat/murmure.git
@@ -40,17 +85,19 @@ cd murmure
 ./install.sh
 ```
 
-L'installeur pose CMake et XcodeGen, télécharge le modèle (~550 Mo, une fois), compile
-`whisper-cli` (whisper.cpp) et l'app `/Applications/Murmure.app`, qui les embarque,
-puis la lance : son icône apparaît dans la barre des menus.
+L'installeur télécharge le modèle (~550 Mo, une fois), compile `whisper-cli`
+(whisper.cpp) et l'app `/Applications/Murmure.app`, qui l'embarque, puis la lance.
+S'il trouve à cette place l'app du DMG (ou de Homebrew), il le signale et demande
+avant de la remplacer.
 
-Le menu signale une nouvelle version (« Version X.Y.Z disponible », qui ouvre la page
-de la release). Pour mettre à jour, `git pull` puis `./install.sh` à nouveau. L'installeur ne remplace
+Pour mettre à jour, `git pull` puis `./install.sh` à nouveau. L'installeur ne remplace
 que ce qui a changé et l'annonce en fin d'installation : tant que `Murmure.app` est
 inchangée, elle n'est ni recréée ni re-signée et macOS conserve les autorisations.
 Le modèle est vérifié par son empreinte SHA-256 ; un téléchargement interrompu reprend
 au lancement suivant. `./install.sh --verify` recalcule l'empreinte d'un modèle déjà
-présent et le retélécharge s'il est corrompu.
+présent et le retélécharge s'il est corrompu. Une app compilée ainsi reçoit aussi les
+mises à jour automatiques, qui la remplacent par la version publiée ;
+`MURMURE_CHECK_UPDATES=0` (voir [Réseau](#réseau)) l'en empêche.
 
 ### Les deux autorisations
 
@@ -60,25 +107,28 @@ Pour que le texte se colle tout seul, ajoutez ensuite `Murmure.app` dans
 **Réglages > Confidentialité et sécurité > Accessibilité**. Sans cela le texte
 arrive dans le presse-papiers et vous faites ⌘V vous-même.
 
-macOS rattache ces autorisations à la signature de l'app. Si le trousseau contient
-un certificat de développeur Apple (« Developer ID Application », sinon « Apple
-Development »), `install.sh` signe `Murmure.app` avec : macOS la reconnaît alors à
-son identifiant et à votre équipe, et les autorisations survivent aux mises à jour.
-Sans certificat, l'app est signée ad hoc, reconnue à l'empreinte de son binaire :
-chaque recompilation oblige à redonner l'Accessibilité (voir Dépannage).
-`MURMURE_SIGN_IDENTITY` choisit un certificat (nom, équipe ou empreinte SHA-1) ;
-`MURMURE_SIGN_IDENTITY=-` force la signature ad hoc.
-
 Murmure vérifie ces autorisations elle-même. Tant que l'Accessibilité manque (ou que
 le micro est refusé), l'icône de la barre des menus porte un point d'exclamation et
 le menu commence par « ⚠︎ Collage automatique désactivé — Autoriser… », qui ouvre
-le bon panneau des Réglages ; au premier lancement concerné, une alerte explique la
-marche à suivre. L'alerte du menu disparaît d'elle-même dès l'autorisation accordée.
-Si le collage reste refusé malgré tout, le menu propose « Relancer Murmure ».
+le bon panneau des Réglages ; une alerte explique la marche à suivre (au premier
+lancement, une fois le modèle téléchargé). L'alerte du menu disparaît d'elle-même dès
+l'autorisation accordée. Si le collage reste refusé malgré tout, le menu propose
+« Relancer Murmure ».
 
-En venant d'une version où `Murmure.app` n'était qu'un lanceur (déclenché par
-Karabiner), macOS redemande ces deux autorisations **une fois** : l'app est nouvelle
-à ses yeux.
+macOS rattache ces autorisations à la signature de l'app. Celle du DMG et de Homebrew
+est signée par un certificat Developer ID : ses mises à jour gardent les autorisations.
+En passant d'une copie compilée sur votre Mac à celle du DMG (ou l'inverse), macOS
+redemande les deux autorisations **une fois**. L'ancienne entrée Accessibilité reste
+cochée mais ne vaut plus : sélectionnez-la, supprimez-la (–), puis rajoutez Murmure
+(+).
+
+Depuis les sources, si le trousseau contient un certificat de développeur Apple
+(« Developer ID Application », sinon « Apple Development »), `install.sh` signe
+`Murmure.app` avec : macOS la reconnaît alors à son identifiant et à votre équipe, et
+les autorisations survivent aux recompilations. Sans certificat, l'app est signée ad
+hoc, reconnue à l'empreinte de son binaire : chaque recompilation oblige à redonner
+l'Accessibilité (voir Dépannage). `MURMURE_SIGN_IDENTITY` choisit un certificat (nom,
+équipe ou empreinte SHA-1) ; `MURMURE_SIGN_IDENTITY=-` force la signature ad hoc.
 
 ### Le raccourci
 
@@ -182,8 +232,8 @@ corrections.
 
 ### Le fichier `config`
 
-L'installeur le dépose avec toutes les clés en commentaire, à leur valeur par défaut,
-et ne l'écrase jamais ensuite. Pour changer un réglage, retirez le `#` et modifiez la
+Murmure le dépose au premier lancement avec toutes les clés en commentaire, à leur
+valeur par défaut, et ne l'écrase jamais ensuite. Pour changer un réglage, retirez le `#` et modifiez la
 valeur ; il s'applique à la dictée suivante, sans rien relancer :
 
 ```
@@ -238,15 +288,16 @@ transcription part d'elle-même, comme sur un second appui.
 ![Compte à rebours avant la durée maximale](docs/apercu-compte-a-rebours.png)
 
 **Le micro** se désigne par son index ou, plus sûrement, par son nom : l'index change
-quand on branche un casque. La liste figure sous « AVFoundation audio devices » :
+quand on branche un casque. La fenêtre **Réglages…** les propose ; la liste, dans
+l'ordre des index (`:0`, `:1`…), s'obtient aussi avec l'enregistreur de l'app :
 
 ```bash
-ffmpeg -f avfoundation -list_devices true -i ""
+/Applications/Murmure.app/Contents/Helpers/murmure-rec --list-devices
 ```
 
 Le nom exact est cherché d'abord (casse ignorée), puis un nom qui le contient. S'il
-n'est pas trouvé, Murmure prend le micro `:0` et le note dans le journal.
-`MURMURE_DEVICE=:default` suit le micro choisi dans les réglages du système.
+n'est pas trouvé, Murmure prend le micro par défaut du système et le note dans le
+journal. `MURMURE_DEVICE=:default` suit le micro choisi dans les réglages du système.
 
 Une variable d'environnement du même nom l'emporte sur le fichier, pratique pour un
 essai depuis le terminal : `MURMURE_LANG=en /Applications/Murmure.app/Contents/Resources/engine/murmure.sh`.
@@ -290,7 +341,7 @@ scripts/bench.sh -c 'défaut|' -b 'embarqué|build/whisper/whisper-cli' \
 
 ```
 ⌘⇧E → Murmure.app (barre des menus) → murmure.sh
-                      ├─ ffmpeg (avfoundation) ──→ WAV 16 kHz mono
+                      ├─ murmure-rec (Core Audio) → WAV 16 kHz mono
                       ├─ overlay (AppKit) ───────→ pastille flottante
                       ├─ whisper-cli ────────────→ texte
                       ├─ corriger.pl ────────────→ vocabulaire rectifié
@@ -352,21 +403,35 @@ d'environ 1 Mo, le journal est renommé `murmure.log.1` et repart de zéro.
 | Texte copié mais pas collé, notification « Autorise Murmure dans Réglages > Accessibilité » | autorisation Accessibilité absente ou périmée (`n'est pas autorisé à envoyer de saisies. (1002)` dans le journal) : dans la liste Accessibilité, supprimez l'entrée Murmure (–), même cochée, puis rajoutez-la (+) |
 | Texte copié mais pas collé, sans cette notification | l'app cible n'a pas repris le premier plan, ou a été quittée : le journal le dit |
 | Accents cassés (`Soci√©t√©`) | locale non UTF-8 dans l'environnement du raccourci |
-| Première dictée très lente | chargement du modèle et des shaders Metal ; les suivantes sont rapides |
+| Première dictée très lente | après l'installation ou une mise à jour, Murmure prépare `whisper-cli` (« Préparation… » dans le menu, moins d'une minute) : une dictée lancée avant la fin attend la compilation des shaders Metal. Les suivantes sont rapides |
 | ⌘⇧E démarre puis arrête aussitôt, ou lance autre chose | une règle Karabiner encore active : `./install.sh` la signale, retirez-la dans Complex Modifications |
 | ⌘⇧E ne fait rien | Murmure n'est pas ouverte (icône absente) ou le raccourci est pris : le menu et le journal l'indiquent |
-| Autorisations à redonner après une mise à jour | l'identité de `Murmure.app` a changé (l'installeur l'indique) : signature ad hoc recompilée, ou passage à un certificat. L'ancienne entrée Accessibilité reste cochée mais ne vaut plus : supprimez-la (–) puis rajoutez-la. Avec un certificat, cela n'arrive qu'une fois |
+| Autorisations à redonner après une mise à jour | l'identité de `Murmure.app` a changé : passage d'une copie compilée sur ce Mac (1.1.0, `./install.sh`) à l'app du DMG ou l'inverse, signature ad hoc recompilée, ou passage à un certificat. L'ancienne entrée Accessibilité reste cochée mais ne vaut plus : supprimez-la (–) puis rajoutez-la. Avec un certificat, cela n'arrive qu'une fois |
+| Le Finder refuse de remplacer `Murmure.app` | l'app est ouverte : quittez-la depuis son menu (**Quitter Murmure**), puis recommencez |
 | « ⚠︎ Collage refusé par macOS — Relancer Murmure » dans le menu | l'autorisation est accordée mais pas encore prise en compte : choisissez cette entrée |
-| Erreur de modèle au lancement de Whisper | fichier abîmé : `./install.sh --verify` |
+| Erreur de modèle au lancement de Whisper | fichier abîmé : supprimez `~/.local/share/murmure/.modele-verifie` puis relancez Murmure, qui revérifie le modèle et propose de le retélécharger (depuis les sources : `./install.sh --verify`) |
 
 ## Désinstallation
+
+**App du DMG** : décochez **Ouvrir au démarrage** dans le menu, quittez Murmure, puis
+mettez `Murmure.app` à la corbeille. Vos données restent dans `~/.local/share/murmure`
+(réglages, vocabulaire, corrections, historique, modèle) : supprimez ce dossier pour
+tout effacer.
+
+**Homebrew** : `brew uninstall --cask murmure`, ou `brew uninstall --zap --cask murmure`
+pour retirer aussi les données et les réglages.
+
+**Depuis les sources** :
 
 ```bash
 ./uninstall.sh
 ```
 
-Le script quitte Murmure, retire le lancement au démarrage, l'app, le modèle et les
-fichiers de `~/.local/share/murmure`.
+Le script quitte Murmure, retire le lancement au démarrage, l'app (celle du DMG
+comprise), les caches et réglages des mises à jour, puis demande s'il faut aussi
+supprimer vos données de `~/.local/share/murmure`, modèle compris.
+
+Dans tous les cas, retirez ensuite l'entrée Murmure de la liste Accessibilité.
 
 ## Contribuer
 
@@ -379,3 +444,62 @@ L'icône de l'app (`app/Murmure.icns`, versionnée) et ses déclinaisons pour le
 ## Licence
 
 MIT — voir [LICENSE](LICENSE).
+
+## English
+
+**Murmure is fully local, system-wide voice dictation for macOS.** Press a shortcut,
+speak, and the text is pasted into the app you're using. Your voice is transcribed by
+[whisper.cpp](https://github.com/ggerganov/whisper.cpp) (Whisper `large-v3-turbo`) on
+your Mac, offline: no account, no subscription, no API key, nothing sent anywhere. The
+app's interface is in French; dictation works in French by default, and in English or
+any Whisper language from **Réglages…** (Settings) or `MURMURE_LANG=en`.
+
+### Install
+
+Requires an Apple Silicon Mac (M1 or later) running macOS 14 or later.
+
+- **Download [Murmure.dmg](https://github.com/croustibat/murmure/releases/latest/download/Murmure.dmg)**,
+  open it and drag **Murmure** to **Applications**. The app is signed and notarized
+  by Apple and bundles everything it needs: no Homebrew, no Xcode. On first launch it
+  offers to download its transcription model (~550 MB, once, checked against its
+  SHA-256 hash).
+- **Or with Homebrew**: `brew install --cask croustibat/tap/murmure` (same app).
+- **Or from source**: Xcode, CMake and XcodeGen (installed with Homebrew if missing),
+  then `git clone https://github.com/croustibat/murmure.git && cd murmure && ./install.sh`.
+
+Murmure lives in the menu bar. Dictate with **⌘⇧E**: press, talk, press again — or
+hold the keys while you talk. **Esc** cancels. Two permissions are needed:
+**Microphone** (macOS asks on first use) and **Accessibility** (System Settings >
+Privacy & Security > Accessibility), so the text can be pasted for you. Until then,
+the menu shows what's missing and opens the right pane.
+
+### Updates
+
+Murmure checks for a new version once a day and installs it in one click, with
+[Sparkle](https://sparkle-project.org). Your settings, vocabulary, corrections,
+history and model are kept, and so are the permissions.
+
+Coming from version 1.1.0 or earlier (installed with `./install.sh`)? Those don't
+update themselves: quit Murmure, download Murmure.dmg and drag the app to
+Applications, replacing the old one. Everything in `~/.local/share/murmure` is kept.
+Since the old app was built on your Mac, macOS asks once more for the microphone and
+Accessibility: in the Accessibility list, remove the old Murmure entry (–), even if
+it's checked, then add Murmure again (+).
+
+### Network
+
+Transcription never leaves your Mac. Murmure makes exactly two kinds of requests: the
+one-time model download from Hugging Face, and, at most once a day, reading
+`appcast.xml` from this repository's latest GitHub release to check for updates (an
+update you accept is downloaded from that same release). No text, audio, identifier or
+system profile is sent. `MURMURE_CHECK_UPDATES=0` in
+`~/.local/share/murmure/config` turns update checks off.
+
+### Uninstall
+
+DMG: quit Murmure and move it to the Trash; delete `~/.local/share/murmure` to remove
+your data and the model. Homebrew: `brew uninstall --zap --cask murmure`. From source:
+`./uninstall.sh`. Then remove Murmure from the Accessibility list.
+
+Everything else (configuration, vocabulary, corrections, troubleshooting) is
+documented in French above. MIT license.

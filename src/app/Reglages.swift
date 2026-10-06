@@ -133,7 +133,7 @@ enum EnregistreurRaccourci {
 
 final class FenetreReglages: NSObject, NSWindowDelegate {
     static let langues = ["fr", "en", "es", "de", "it", "auto"]
-    private static let micDefaut = ":default"   // micro par défaut du système (ffmpeg)
+    private static let micDefaut = ":default"   // micro par défaut du système (murmure-rec)
 
     private let suspendreRaccourci: () -> Void
     private let appliquerRaccourci: () -> Bool
@@ -361,7 +361,7 @@ final class FenetreReglages: NSObject, NSWindowDelegate {
         secondes % 60 == 0 ? "\(secondes / 60) min" : "\(secondes / 60) min \(secondes % 60) s"
     }
 
-    // Noms des entrées audio, tels que les liste ffmpeg (AVFoundation).
+    // Noms des entrées audio : murmure-rec retrouve le micro par ce nom.
     static func micros() -> [String] {
         AVCaptureDevice.DiscoverySession(deviceTypes: [.microphone, .external], mediaType: .audio,
                                          position: .unspecified)

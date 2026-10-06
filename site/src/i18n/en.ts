@@ -22,7 +22,8 @@ const en: typeof fr = {
     title: 'Speak, and it’s typed.<br>Nothing leaves your Mac.',
     lead:
       'Press a shortcut, talk, and the text is pasted into the app in front of you. Your voice is transcribed by Whisper, on your own machine, offline.',
-    install: 'Install',
+    download: 'Download for Mac',
+    downloadNote: 'macOS 14+, Apple Silicon, free',
     github: 'View on GitHub',
     promises: ['No account', 'No subscription', 'No API key', 'Open source'],
   },
@@ -45,8 +46,8 @@ const en: typeof fr = {
         text: '<a href="https://github.com/ggerganov/whisper.cpp">whisper.cpp</a> and the <code>large-v3-turbo</code> model run on your machine, offline.',
       },
       {
-        title: 'One request, and you can turn it off',
-        text: 'At most once a day, the app reads the latest release number from GitHub. Nothing is sent: no text, no audio, no identifier. <code>MURMURE_CHECK_UPDATES=0</code> disables it.',
+        title: 'Two requests, and that’s it',
+        text: 'The model, downloaded once on first launch, then, at most once a day, the list of releases published on GitHub. Nothing is sent: no text, no audio, no identifier. <code>MURMURE_CHECK_UPDATES=0</code> turns the second one off.',
       },
       {
         title: 'Nothing to sign up for or pay',
@@ -118,15 +119,22 @@ const en: typeof fr = {
   },
   install: {
     title: 'Install',
-    prereqTitle: 'Requirements',
-    prereqs: [
-      'macOS 14 or later',
-      '<a href="https://brew.sh">Homebrew</a>',
-      'Xcode Command Line Tools: <code>xcode-select --install</code>',
+    dmgTitle: 'Download the app',
+    steps: [
+      'Download <code>Murmure.dmg</code>.',
+      'Open it, drag <strong>Murmure</strong> to <strong>Applications</strong>, then launch it: its icon shows up in the menu bar.',
+      'On first launch, Murmure offers to download its transcription model (~550 MB, just once).',
     ],
-    commandsTitle: 'In a terminal',
+    download: 'Download Murmure.dmg',
+    dmgNote:
+      'Requires an Apple Silicon Mac running macOS 14 or later. Signed and notarized by Apple, the app opens without a warning and bundles everything it needs: no Homebrew, no Xcode, no terminal.',
+    brewTitle: 'With Homebrew',
+    brewNote: 'The same app as the DMG, and it updates itself the same way.',
+    sourceTitle: 'From source',
+    sourcePrereqs:
+      'To build Murmure yourself, you need <a href="https://apps.apple.com/app/xcode/id497799835">Xcode</a> (opened once), CMake and XcodeGen; the installer sets those up with <a href="https://brew.sh">Homebrew</a> if they’re missing.',
     after:
-      'The installer sets up <code>ffmpeg</code> and <code>whisper-cpp</code>, downloads the model (~550 MB, once), builds the pill and <code>/Applications/Murmure.app</code>, then launches it: its icon shows up in the menu bar.',
+      'The installer downloads the model, builds <code>whisper-cli</code> (whisper.cpp) and <code>/Applications/Murmure.app</code>, then launches it. To update, run <code>git pull</code> then <code>./install.sh</code>.',
     permissionsTitle: 'Two permissions',
     permissions: [
       {
@@ -139,8 +147,11 @@ const en: typeof fr = {
       },
     ],
     ready: 'You’re set: <kbd>⌘⇧E</kbd>, talk, <kbd>⌘⇧E</kbd>.',
+    updateTitle: 'Updates',
     update:
-      'To update, run <code>git pull</code> then <code>./install.sh</code>. The menu tells you when a new version is out.',
+      'Murmure updates itself: once a day, it checks for a new release and installs it in one click, keeping your settings, your vocabulary, the model and the permissions.',
+    migration:
+      'Coming from version 1.1.0 or earlier, installed with <code>./install.sh</code>? Quit Murmure, download <code>Murmure.dmg</code> and replace the app in Applications. Your settings, vocabulary and model are kept; macOS asks once more for the microphone and Accessibility.',
   },
   faq: {
     title: 'FAQ',
@@ -150,16 +161,24 @@ const en: typeof fr = {
         a: 'French by default. The Settings window also offers English, Spanish, German, Italian and automatic detection, and the <code>config</code> file accepts other Whisper language codes. Murmure’s own interface is in French.',
       },
       {
+        q: 'Do I need Homebrew or Xcode?',
+        a: 'No. The DMG app bundles whisper.cpp and everything else it needs. Homebrew is just another way to install it (<code>brew install --cask croustibat/tap/murmure</code>), and Xcode is only for building Murmure from source.',
+      },
+      {
         q: 'How big is the model?',
-        a: 'About 550 MB, downloaded once by the installer and checked against its SHA-256 hash. It’s only loaded into memory for the length of a dictation.',
+        a: 'About 550 MB, downloaded once by the app on first launch and checked against its SHA-256 hash. It’s only loaded into memory for the length of a dictation.',
+      },
+      {
+        q: 'How does it update?',
+        a: 'By itself, with <a href="https://sparkle-project.org">Sparkle</a>: at most once a day, Murmure reads the list of releases published on GitHub and offers the new one, which installs in one click and restarts the app, never in the middle of a dictation. “Rechercher les mises à jour…” (Check for Updates) in the menu checks right away. Coming from 1.1.0, installed with <code>./install.sh</code>? Download the DMG and replace the app; your settings and model are kept.',
       },
       {
         q: 'Intel or Apple Silicon?',
-        a: 'Murmure is built for Apple Silicon Macs: the script looks for <code>whisper-cli</code> and <code>ffmpeg</code> in <code>/opt/homebrew</code>, where Homebrew installs them on those Macs. On an Intel Mac, Homebrew puts them elsewhere, so dictation won’t work out of the box.',
+        a: 'Apple Silicon only (M1 or later), on macOS 14 or later: the app and the whisper.cpp it bundles are built for those Macs.',
       },
       {
         q: 'How do I uninstall it?',
-        a: 'Run <code>./uninstall.sh</code> from the cloned folder: it quits Murmure and removes launch at login, the app, the model and the files in <code>~/.local/share/murmure</code>. Then remove Murmure from the Accessibility list. <code>ffmpeg</code> and <code>whisper-cpp</code> stay installed through Homebrew.',
+        a: 'Uncheck “Ouvrir au démarrage” (launch at login) in the menu, quit Murmure and move the app to the Trash; delete <code>~/.local/share/murmure</code> to also remove your settings and the model. With Homebrew: <code>brew uninstall --zap --cask murmure</code>. From source: <code>./uninstall.sh</code>. Then remove Murmure from the Accessibility list.',
       },
       {
         q: 'Why not use macOS dictation?',
