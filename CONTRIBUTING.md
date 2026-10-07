@@ -224,13 +224,19 @@ seul, ni un brouillon, ni une pré-version. Une release sans `appcast.xml` n'est
      poussé avant la release : créée d'abord, elle poserait le tag sur le commit
      d'avant. Si la création échoue après le push, le script affiche la commande à
      relancer ; les fichiers sont dans `dist/` ;
-   - contrôle : `releases/latest/download/appcast.xml` annonce le nouveau build.
+   - contrôle : `releases/latest/download/appcast.xml` annonce le nouveau build ;
+   - proposition de mettre à jour le cask Homebrew (`[O/n]`) : `script/update-cask.sh`
+     télécharge le DMG publié, en calcule l'empreinte et pousse `version` et `sha256`
+     dans `Casks/murmure.rb` de
+     [`croustibat/homebrew-tap`](https://github.com/croustibat/homebrew-tap). Refusé,
+     ou en cas d'échec, `./script/update-cask.sh 1.2.0` se lance à part ; il refuse de
+     faire reculer le cask.
 
 4. Vérifier la page de la release et le lien
    <https://github.com/croustibat/murmure/releases/latest/download/Murmure.dmg>. Une
    Murmure de la version précédente propose la nouvelle par « Rechercher les mises à
-   jour… ». Le cask Homebrew (#46) se met à jour ensuite : point d'accroche en fin de
-   `release.sh`.
+   jour… ». `brew update && brew info --cask croustibat/tap/murmure` annonce la
+   nouvelle version ; `brew upgrade` laisse l'app à Sparkle (`auto_updates`).
 
 La 1.1.0 n'a pas Sparkle : ses utilisateurs passent une fois au DMG (section « Vous avez
 la 1.1.0 ? » de `CHANGELOG.md`), les versions suivantes arrivent d'elles-mêmes.

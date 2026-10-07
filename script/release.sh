@@ -419,6 +419,7 @@ fi
 
 if [ "$DRY_RUN" = 1 ]; then
     echo "  [à blanc] contrôle : https://github.com/$REPO/releases/latest/download/appcast.xml annonce le build $BUILD"
+    echo "  [à blanc] cask Homebrew proposé : ./script/update-cask.sh $VERSION"
     if [ ${#BLOCKERS[@]} -gt 0 ]; then
         echo "✗ La vraie publication serait refusée :" >&2
         printf '  - %s\n' "${BLOCKERS[@]}" >&2
@@ -439,6 +440,16 @@ echo "✓ Murmure $VERSION publiée : https://github.com/$REPO/releases/tag/$TAG
 echo "  Lien stable  : https://github.com/$REPO/releases/latest/download/Murmure.dmg"
 echo "  Flux Sparkle : https://github.com/$REPO/releases/latest/download/appcast.xml"
 
-# Cask Homebrew (#46) : mettre à jour croustibat/homebrew-tap avec la version
-# et l'empreinte du DMG publié, une fois la release en ligne. Par exemple :
-#   scripts/update-cask.sh "$VERSION" "$(shasum -a 256 "$DIST/Murmure.dmg" | cut -d' ' -f1)"
+# Cask Homebrew : proposé une fois la release en ligne. Un échec ne touche pas
+# la publication, déjà faite : la commande affichée se lance à part.
+CASK_CMD="./script/update-cask.sh $VERSION"
+if [ -t 0 ]; then
+    printf 'Mettre à jour le cask Homebrew (croustibat/homebrew-tap) ? [O/n] '
+    read -r REPONSE || REPONSE=n
+    case "$REPONSE" in
+        [nN]*) echo "  Plus tard : $CASK_CMD" ;;
+        *) script/update-cask.sh "$VERSION" || echo "  ! cask non mis à jour ; relancer : $CASK_CMD" >&2 ;;
+    esac
+else
+    echo "  Cask Homebrew : $CASK_CMD"
+fi
