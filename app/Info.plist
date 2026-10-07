@@ -13,7 +13,7 @@
     <!-- Numéro de build entier, augmenté à chaque release : Sparkle compare ce
          nombre, pas la version affichée. -->
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>2</string>
     <!-- Remplacée à la compilation par le contenu de VERSION (phase « Version »
          de project.yml). -->
     <key>CFBundleShortVersionString</key>
