@@ -15,6 +15,7 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let bascule = NSMenuItem(title: "Démarrer la dictée", action: #selector(basculer), keyEquivalent: "")
     private let demarrage = NSMenuItem(title: "Ouvrir au démarrage", action: #selector(changerDemarrage), keyEquivalent: "")
     private let historique = Historique()
+    private let statistiques = Statistiques()
     private lazy var misesAJour = MisesAJourSparkle(dicteeEnCours: { [unowned self] in (etat ?? .pret) != .pret })
     private let autorisations = Autorisations()
     private var raccourcis: Raccourcis!
@@ -58,7 +59,7 @@ final class Barre: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let quitter = NSMenuItem(title: "Quitter Murmure", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         for i in [autorisations.accessibilite, autorisations.micro, autorisations.relancer, autorisations.separateur,
-                  ligneEtat, ligneRaccourci, bascule, .separator(), dernieres, .separator(),
+                  ligneEtat, ligneRaccourci, bascule, .separator(), dernieres, statistiques.item, .separator(),
                   reglages, demarrage, journalItem, .separator(), misesAJour.disponible, versionItem, misesAJour.rechercher, quitter] {
             menu.addItem(i)
         }

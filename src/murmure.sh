@@ -103,6 +103,7 @@ WHISPER_ERR="$STATE_DIR/whisper.err"   # sortie d'erreur de whisper-cli
 LOG_MAX="${MURMURE_LOG_MAX:-1048576}"   # au-delà, murmure.log devient murmure.log.1
 HOLD_MS="${MURMURE_HOLD_MS:-600}" # au-delà, relâcher la touche arrête la capture
 HISTORIQUE="$MURMURE_HOME/historique.jsonl"   # dernières dictées, lues par le menu
+STATISTIQUES="$MURMURE_HOME/statistiques.json"   # totaux par jour, sans texte, lus par le menu
 RESTORE_CLIPBOARD="${MURMURE_RESTORE_CLIPBOARD:-0}"
 APP_BIN="${MURMURE_APP:-$CONTENTS/MacOS/Murmure}"
 OVERLAY="${MURMURE_OVERLAY:-$CONTENTS/Helpers/overlay}"   # pastille, dans le bundle
@@ -310,28 +311,70 @@ has_speech() {
 }
 
 # Ajoute la dictée à l'historique (une ligne JSON par dictée, 100 au plus, les
-# plus anciennes supprimées). JSON::PP échappe guillemets et retours ligne ;
-# réécriture dans un fichier temporaire puis renommage, lecture comprise par le
-# menu. Local uniquement : MURMURE_HISTORY=0 n'écrit rien.
+# plus anciennes supprimées) et aux totaux de son jour dans statistiques.json
+# (dictées, mots, secondes d'audio, apps : aucun texte, jamais tronqué). Sans
+# ce fichier, les totaux repartent de l'historique d'avant cette dictée ;
+# illisible, il est mis de côté en .illisible, jamais écrasé. JSON::PP échappe
+# guillemets et retours ligne ; chaque fichier est réécrit à part puis renommé,
+# lecture comprise par le menu, et l'échec de l'un n'empêche pas l'autre. Les
+# messages de perl (sortie standard) vont au journal. Local uniquement :
+# MURMURE_HISTORY=0 n'écrit rien.
 # $1 texte, $2 taille du WAV en octets, $3 bundle id de l'app cible.
 add_history() {
   [ "${MURMURE_HISTORY:-1}" = 0 ] && return 0
+  local note
   HIST_TEXTE=$1 HIST_OCTETS=$2 HIST_APP=$3 perl -MJSON::PP -MPOSIX=strftime -e '
-    my $f = shift;
+    my ($f, $s) = @ARGV;
+    my $json = JSON::PP->new->utf8->canonical;
+    umask 077;
+    sub ecrire {
+      my ($f, @l) = @_;
+      open my $out, ">", "$f.$$" or die "$f.$$ : $!\n";
+      print $out @l; close $out or die "$f.$$ : $!\n";
+      rename "$f.$$", $f or die "$f : $!\n";
+    }
+    sub compter {   # mots séparés par des espaces, comme split(" ")
+      my ($st, $e) = @_;
+      my $j = $st->{substr $e->{date}, 0, 10} //= {dictees => 0, mots => 0, secondes => 0, apps => {}};
+      $j->{dictees}++;
+      $j->{mots} += () = $e->{texte} =~ /[^ ]+/g;
+      $j->{secondes} = 0 + sprintf("%.1f", $j->{secondes} + $e->{duree_audio_s});
+      $j->{apps}{$e->{app}}++ if $e->{app};
+    }
     my $texte = $ENV{HIST_TEXTE}; utf8::decode($texte);
     (my $date = strftime("%Y-%m-%dT%H:%M:%S%z", localtime)) =~ s/(\d\d)$/:$1/;
+    my %e = (date => $date, texte => $texte, app => $ENV{HIST_APP} || undef,
+             duree_audio_s => 0 + sprintf("%.1f", ($ENV{HIST_OCTETS} - 44) / 32000));
     my @l;
     if (open my $in, "<", $f) { @l = map { s/\n?\z/\n/r } grep { /\S/ } <$in>; close $in }
-    push @l, JSON::PP->new->utf8->canonical->encode({
-      date => $date, texte => $texte, app => $ENV{HIST_APP} || undef,
-      duree_audio_s => 0 + sprintf("%.1f", ($ENV{HIST_OCTETS} - 44) / 32000),
-    }) . "\n";
-    splice @l, 0, @l - 100 if @l > 100;
-    umask 077;
-    open my $out, ">", "$f.$$" or die "$f.$$ : $!\n";
-    print $out @l; close $out or die "$f.$$ : $!\n";
-    rename "$f.$$", $f or die "$f : $!\n";
-  ' "$HISTORIQUE" 2>>"$LOG" || log "historique : écriture impossible"
+    eval {
+      my $st;
+      if (-e $s) {
+        open my $in, "<", $s or die "$s : $!\n";
+        $st = eval { $json->decode(do { local $/; <$in> }) };
+        if (ref $st ne "HASH" or grep { ref ne "HASH" } values %$st) {
+          my ($i, $n) = ("$s.illisible", 0);
+          $i = "$s.illisible." . ++$n while -e $i;
+          rename $s, $i or die "$s : $!\n";
+          print "statistiques illisibles, renommées en $i : recomptées depuis l’historique\n";
+          undef $st;
+        }
+      }
+      if (!$st) {
+        $st = {};
+        for (@l) { my $h = eval { $json->decode($_) }; compter($st, $h) if ref $h eq "HASH" && $h->{date} }
+      }
+      compter($st, \%e);
+      ecrire($s, $json->encode($st));
+      1;
+    } or print "statistiques : écriture impossible : $@";
+    eval {
+      push @l, $json->encode(\%e) . "\n";
+      splice @l, 0, @l - 100 if @l > 100;
+      ecrire($f, @l);
+      1;
+    } or print "historique : écriture impossible : $@";
+  ' "$HISTORIQUE" "$STATISTIQUES" 2>>"$LOG" | while IFS= read -r note; do log "$note"; done
 }
 
 # Copies du moteur que les versions ≤ 1.1.0 installaient dans $MURMURE_HOME :

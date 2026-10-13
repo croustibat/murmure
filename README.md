@@ -185,6 +185,14 @@ une dictée. **Effacer l'historique** vide la liste. L'historique est gardé dan
 supprimées) : il reste sur ce Mac et n'est jamais envoyé nulle part.
 `MURMURE_HISTORY=0` dans le fichier `config` n'enregistre plus rien.
 
+**Statistiques** fait le compte : mots dictés, vitesse moyenne, temps gagné par rapport
+à la frappe au clavier (40 mots/min), mots du jour, série de jours d'affilée et apps
+où l'on dicte le plus. Murmure tient pour chaque jour le nombre de dictées, de mots,
+les secondes de parole et les apps, sans aucun texte, dans
+`~/.local/share/murmure/statistiques.json` : ces totaux restent sur ce Mac et ne sont
+jamais envoyés nulle part. **Effacer l'historique** ne les touche pas ;
+`MURMURE_HISTORY=0` coupe aussi les statistiques.
+
 **Réglages…** (⌘,) ouvre une fenêtre pour le raccourci, le micro (par son nom, ou
 celui du système), la langue, le seuil d'appui maintenu, la durée maximale,
 l'historique, la restauration du presse-papiers et le lancement au démarrage. Elle
