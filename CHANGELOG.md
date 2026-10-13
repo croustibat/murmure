@@ -4,6 +4,11 @@ Nouveautés de chaque version publiée de Murmure. `script/release.sh` reprend l
 section de la version publiée dans la release GitHub et dans la fenêtre de mise
 à jour (Sparkle) ; sans section, il reprend les sujets des commits.
 
+## 1.3.0
+
+- Nouveau sous-menu « Statistiques » : mots dictés, vitesse moyenne, temps gagné par rapport au clavier, mots du jour, jours d'affilée et apps où vous dictez le plus. Il démarre avec vos 100 dernières dictées.
+- Les compteurs restent sur ce Mac et ne gardent aucun texte, seulement des totaux par jour. « Effacer l'historique » ne les touche pas ; `MURMURE_HISTORY=0` les désactive aussi.
+
 ## 1.2.0
 
 - Murmure s'installe depuis un DMG signé et notarisé par Apple : ouvrez `Murmure.dmg` et glissez Murmure dans Applications. Plus besoin de Homebrew, de Xcode ni du terminal.
