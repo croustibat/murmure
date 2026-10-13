@@ -49,9 +49,9 @@ aussi le moteur à jour :
 
 `~/.local/share/murmure` (`MURMURE_HOME`) ne garde que les données de l'utilisateur :
 `config`, `vocabulaire.txt`, `corrections.txt`, `models/`, `historique.jsonl`,
-`cadence`. Au lancement, l'app y dépose les réglages par défaut qui manquent, sans
-jamais écraser un fichier (un vocabulaire ou des corrections modifiés reçoivent la
-nouvelle version à côté, en `.dist`).
+`statistiques.json`, `cadence`. Au lancement, l'app y dépose les réglages par défaut
+qui manquent, sans jamais écraser un fichier (un vocabulaire ou des corrections
+modifiés reçoivent la nouvelle version à côté, en `.dist`).
 
 `murmure.sh` trouve les outils à côté de lui, dans le bundle. Lancé depuis les sources
 (`src/murmure.sh`), il prend ceux de l'app désignée par `MURMURE_APP`, sinon de
